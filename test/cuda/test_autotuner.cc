@@ -51,7 +51,9 @@ struct ATenCompilationUnitTest : public ::testing::TestWithParam<bool> {
       tc::FLAGS_tuner_gen_pop_size = 8;
       tc::FLAGS_tuner_gen_generations = 5;
       tc::FLAGS_tuner_threads = std::min(8u, tc::FLAGS_tuner_gen_pop_size);
-      tc::FLAGS_tuner_gen_number_elites = tc::FLAGS_tuner_gen_pop_size / 4;
+      tc::FLAGS_tuner_gen_mating_pool_size = tc::FLAGS_tuner_gen_pop_size * 3;
+      tc::FLAGS_tuner_gen_selection_pool_size =
+          tc::FLAGS_tuner_gen_pop_size * 3;
     }
     tc::FLAGS_tuner_gen_profiled_run = GetParam();
   }
