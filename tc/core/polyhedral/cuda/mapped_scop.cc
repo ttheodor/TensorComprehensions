@@ -176,7 +176,7 @@ void fixThreadsBelowFilter(
 
   for (size_t i = begin; i < end; ++i) {
     if (mapping::ThreadId::makeId(i) == mapping::ThreadId::x()) {
-      // Mapping happend below filterTree, so we need points active for its
+      // Mapping happened below filterTree, so we need points active for its
       // children.  After insertion, filterTree is guaranteed to have at least
       // one child.
       mscop.threadIdxXScheduleDepthState.emplace_back(std::make_pair(
@@ -357,7 +357,7 @@ size_t MappedScop::mapToThreads(detail::ScheduleTree* band) {
 
   // Immediately return if mapping to one thread dimension only was requested
   // and a reduction was already mapped.  (Note that reduction is detected only
-  // if there are not enough outer coincident members, 0 in this case).
+  // if there are enough outer coincident members, 0 in this case).
   if (nMappedThreads == 0) {
     return nMappedReductionThreads;
   }
