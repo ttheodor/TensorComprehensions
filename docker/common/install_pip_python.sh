@@ -8,6 +8,8 @@ apt-get install -y --no-install-recommends python3-dev python3-pip python3-setup
 
 pip3 install --upgrade pip
 pip3 install numpy decorator six future setuptools pyyaml
+# install the devel needed for aten
+pip3 install mkl-devel typing
 
 which python3
 python3 --version

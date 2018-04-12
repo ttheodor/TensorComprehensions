@@ -74,9 +74,12 @@ run `docker images` and get the `IMAGE_ID` for the image we just built.
 docker run --runtime=nvidia -i -t ${IMAGE_ID}
 # now clone the TC repo
 cd $HOME && git clone https://github.com/facebookresearch/TensorComprehensions.git --recursive && cd TensorComprehensions
+git submodule update --init --recursive
 # build TC
-conda install -y -c pytorch pytorch
-WITH_PYTHON_C2=OFF CLANG_PREFIX=/usr/local/clang+llvm-tapir5.0 ./build.sh --all
+conda install -y mkl-include pyyaml
+conda install -yc conda-forge pytest
+conda install -y pytorch-nightly -c pytorch
+CORES=$(nproc) WITH_CAFFE2=ON CLANG_PREFIX=/usr/local/clang+llvm-tapir5.0 BUILD_TYPE=Release ./build.sh --all
 # Test the TC build is fine
 ./test.sh
 ./test_python/run_test.sh
