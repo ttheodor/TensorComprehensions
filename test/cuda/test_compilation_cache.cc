@@ -507,39 +507,39 @@ TEST_F(OptionsCacheTest, Merge) {
 
   auto ret = tc::OptionsCache::getCache()->retrieveOptionsAndRuntimes(
       "kernel0", inputPtrs, outputPtrs);
-  ASSERT_EQ(ret.size(), 2);
+  ASSERT_EQ(ret.size(), 2u);
   ASSERT_EQ(ret[0].options, options1);
-  ASSERT_EQ(ret[0].profilingInfo.size(), 0);
-  ASSERT_EQ(ret[0].recordedRuntimes.size(), 2);
+  ASSERT_EQ(ret[0].profilingInfo.size(), 0u);
+  ASSERT_EQ(ret[0].recordedRuntimes.size(), 2u);
   ASSERT_EQ(ret[0].recordedRuntimes[0], std::chrono::microseconds(10));
   ASSERT_EQ(ret[0].recordedRuntimes[1], std::chrono::microseconds(11));
 
   ASSERT_EQ(ret[1].options, options2);
-  ASSERT_EQ(ret[1].profilingInfo.size(), 0);
-  ASSERT_EQ(ret[1].recordedRuntimes.size(), 1);
+  ASSERT_EQ(ret[1].profilingInfo.size(), 0u);
+  ASSERT_EQ(ret[1].recordedRuntimes.size(), 1u);
   ASSERT_EQ(ret[1].recordedRuntimes[0], std::chrono::microseconds(21));
 
   ret = tc::OptionsCache::getCache()->retrieveOptionsAndRuntimes(
       "kernel1", inputPtrs, outputPtrs);
-  ASSERT_EQ(ret.size(), 1);
+  ASSERT_EQ(ret.size(), 1u);
   ASSERT_EQ(ret[0].options, options1);
-  ASSERT_EQ(ret[0].profilingInfo.size(), 0);
-  ASSERT_EQ(ret[0].recordedRuntimes.size(), 1);
+  ASSERT_EQ(ret[0].profilingInfo.size(), 0u);
+  ASSERT_EQ(ret[0].recordedRuntimes.size(), 2u);
   ASSERT_EQ(ret[0].recordedRuntimes[0], std::chrono::microseconds(1));
 
   auto retProf = tc::OptionsCache::getCache()->retrieveOptionsAndProfilingInfo(
       "kernel1", inputPtrs, outputPtrs);
-  ASSERT_EQ(retProf.size(), 1);
+  ASSERT_EQ(retProf.size(), 1u);
   ASSERT_EQ(retProf[0].options, options1);
-  ASSERT_EQ(retProf[0].profilingInfo.size(), 1);
+  ASSERT_EQ(retProf[0].profilingInfo.size(), 1u);
   ASSERT_EQ(retProf[0].profilingInfo.front(), pInfoOrig);
 
   ret = tc::OptionsCache::getCache()->retrieveOptionsAndRuntimes(
       "kernel2", inputPtrs, outputPtrs);
-  ASSERT_EQ(ret.size(), 1);
+  ASSERT_EQ(ret.size(), 1u);
   ASSERT_EQ(ret.front().options, options1);
-  ASSERT_EQ(ret[0].profilingInfo.size(), 0);
-  ASSERT_EQ(ret[0].recordedRuntimes.size(), 1);
+  ASSERT_EQ(ret[0].profilingInfo.size(), 0u);
+  ASSERT_EQ(ret[0].recordedRuntimes.size(), 1u);
   ASSERT_EQ(ret[0].recordedRuntimes[0], std::chrono::microseconds(10));
 }
 

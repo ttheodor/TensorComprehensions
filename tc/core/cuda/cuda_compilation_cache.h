@@ -92,6 +92,7 @@ struct OptionsCachedEntry {
     std::string gitVersion;
 
     bool operator==(const Key& other) const;
+    bool operator<(const Key& other) const;
   };
 
   struct Values {

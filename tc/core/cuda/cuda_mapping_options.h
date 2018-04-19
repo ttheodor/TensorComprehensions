@@ -156,6 +156,7 @@ class CudaMappingOptions {
   /// Compare with another message.
   inline bool operator==(const CudaMappingOptions& options) const;
   inline bool operator!=(const CudaMappingOptions& options) const;
+  inline bool operator<(const CudaMappingOptions& options) const;
 
   /// Construct from a serialized protocol buffer message.
   inline explicit CudaMappingOptions(const std::string& str);

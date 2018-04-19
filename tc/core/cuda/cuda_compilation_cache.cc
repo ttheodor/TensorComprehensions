@@ -578,32 +578,39 @@ void OptionsCache::mergeWith(const OptionsCache& other) {
   std::lock(mtx_, other.mtx_);
   std::lock_guard<std::mutex> lock1(mtx_, std::adopt_lock);
   std::lock_guard<std::mutex> lock2(other.mtx_, std::adopt_lock);
-  for (const auto& entry : other.entries_) {
-    auto it = std::find_if(
-        entries_.begin(),
-        entries_.end(),
-        [&entry](const OptionsCache::CachedEntry& e) {
-          return entry.key == e.key;
-        });
-    if (it == entries_.end()) {
+  std::map<OptionsCachedEntry::Key, size_t> entriesIdxMap;
+  size_t idx = 0;
+  for (auto& entry : entries_) {
+    CHECK_EQ(entriesIdxMap.count(entry.key), 0);
+    entriesIdxMap[entry.key] = idx++;
+  }
+
+  for (auto& entry : other.entries_) {
+    auto it = entriesIdxMap.find(entry.key);
+    if (it == entriesIdxMap.end()) {
       entries_.push_back(entry);
       continue;
     }
-    auto& values = it->values;
+    auto& values = entries_[it->second].values;
+    std::map<CudaMappingOptions, size_t> valuesIdxMap;
+    idx = 0;
+    for (auto& val : values) {
+      CHECK_EQ(valuesIdxMap.count(val.mappingOptions), 0);
+      valuesIdxMap[val.mappingOptions] = idx++;
+    }
+
     for (const auto& val : entry.values) {
-      auto it = std::find_if(
-          values.begin(), values.end(), [&val](const CachedEntry::Values& v) {
-            return v.mappingOptions == val.mappingOptions;
-          });
-      if (it == values.end()) {
+      auto it = valuesIdxMap.find(val.mappingOptions);
+      if (it == valuesIdxMap.end()) {
         values.push_back(val);
       } else {
-        it->recordedRuntimes.insert(
-            it->recordedRuntimes.end(),
+        auto& v = values[it->second];
+        v.recordedRuntimes.insert(
+            v.recordedRuntimes.end(),
             val.recordedRuntimes.begin(),
             val.recordedRuntimes.end());
-        it->profiles.insert(
-            it->profiles.end(), val.profiles.begin(), val.profiles.end());
+        v.profiles.insert(
+            v.profiles.end(), val.profiles.begin(), val.profiles.end());
       }
     }
   }
@@ -611,8 +618,14 @@ void OptionsCache::mergeWith(const OptionsCache& other) {
 
 bool OptionsCachedEntry::Key::operator==(const Key& other) const {
   return id == other.id and inputs == other.inputs and
-      outputs == other.outputs and deviceStr == other.deviceStr and
-      gitVersion == other.gitVersion;
+      outputs == other.outputs and deviceStr == other.deviceStr;
+  // and gitVersion == other.gitVersion;
+}
+
+bool OptionsCachedEntry::Key::operator<(const Key& other) const {
+  return id < other.id or inputs < other.inputs or outputs < other.outputs or
+      deviceStr < other.deviceStr;
+  // or gitVersion < other.gitVersion;
 }
 
 std::vector<OptionsCacheRetrievalResult>

@@ -178,6 +178,11 @@ bool CudaMappingOptions::operator!=(const CudaMappingOptions& options) const {
       options.ownedProto_.SerializeAsString();
 }
 
+bool CudaMappingOptions::operator<(const CudaMappingOptions& options) const {
+  return ownedProto_.SerializeAsString() <
+      options.ownedProto_.SerializeAsString();
+}
+
 CudaMappingOptions& CudaMappingOptions::mapToThreads(
     std::initializer_list<uint64_t> threads) {
   block = CudaDim(threads).view; // tmp CudaDim, copy, delete
