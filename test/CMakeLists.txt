@@ -41,6 +41,7 @@ endforeach()
 # CPP cuda_mapper crosscompile tests
 ################################################################################
 set(CORE_TEST_FILES
+  test_other
   test_cuda_mapper
   test_cuda_mapper_memory_promotion
 )
