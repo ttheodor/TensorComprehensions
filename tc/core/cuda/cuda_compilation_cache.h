@@ -52,6 +52,7 @@ struct OptionsCachedEntry {
       const std::vector<const DLTensor*>& outputs,
       const std::string& deviceStr,
       const CudaMappingOptions& options,
+      const std::string& cuda_source,
       Duration runtime);
   OptionsCachedEntry(
       const std::string& id,
@@ -59,6 +60,7 @@ struct OptionsCachedEntry {
       const std::vector<const DLTensor*>& outputs,
       const std::string& deviceStr,
       const CudaMappingOptions& options,
+      const std::string& cuda_source,
       const CudaProfilingInfo& pInfo);
   OptionsCachedEntry(
       const std::string& id,
@@ -66,6 +68,7 @@ struct OptionsCachedEntry {
       const std::vector<const DLTensor*>& outputs,
       const std::string& deviceStr,
       const CudaMappingOptions& options,
+      const std::string& cuda_source,
       Duration runtime,
       const CudaProfilingInfo& pInfo);
 
@@ -93,18 +96,30 @@ struct OptionsCachedEntry {
   };
 
   struct Values {
-    Values(const CudaMappingOptions& options, Duration runtime);
-    Values(const CudaMappingOptions& options, const CudaProfilingInfo& pInfo);
     Values(
         const CudaMappingOptions& options,
+        const std::string& cuda_source,
+        Duration runtime);
+    Values(
+        const CudaMappingOptions& options,
+        const std::string& cuda_source,
+        const CudaProfilingInfo& pInfo);
+    Values(
+        const CudaMappingOptions& options,
+        const std::string& cuda_source,
         Duration runtime,
         const CudaProfilingInfo& pInfo);
-    Values(const CudaMappingOptions& options, std::vector<Duration>&& runtimes);
     Values(
         const CudaMappingOptions& options,
+        const std::string& cuda_source,
+        std::vector<Duration>&& runtimes);
+    Values(
+        const CudaMappingOptions& options,
+        const std::string& cuda_source,
         std::vector<Duration>&& runtimes,
         std::vector<CudaProfilingInfo>&& pInfos);
     CudaMappingOptions mappingOptions;
+    std::string cuda_source;
     std::vector<Duration> recordedRuntimes;
     std::vector<CudaProfilingInfo> profiles;
   };
@@ -124,6 +139,19 @@ class OptionsCache : public Cache<OptionsCache, OptionsCachedEntry> {
   using CachedEntry = OptionsCachedEntry;
   using RetrievalResult = OptionsCacheRetrievalResult;
   static std::shared_ptr<OptionsCache>& getGlobalSharedCache();
+
+  decltype(entries_)::iterator begin() {
+    return entries_.begin();
+  }
+  decltype(entries_)::const_iterator begin() const {
+    return entries_.begin();
+  }
+  decltype(entries_)::iterator end() {
+    return entries_.end();
+  }
+  decltype(entries_)::const_iterator end() const {
+    return entries_.end();
+  }
 
   OptionsCache() = default;
   OptionsCache(const OptionsCacheProto& buf);

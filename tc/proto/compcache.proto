@@ -58,6 +58,8 @@ message OptionsCacheValuesProto{
   required CudaMappingOptionsProto kernel_options = 1;
   repeated uint64 recorded_runtimes = 2;
   repeated CudaProfilingProto profiles = 3;
+
+  optional string cuda_source = 8;
 }
 
 message OptionsCacheEntryProto {
@@ -68,6 +70,8 @@ message OptionsCacheEntryProto {
   required string git_version = 5;
 
   repeated OptionsCacheValuesProto values = 6;
+
+  optional string tc_source = 9;
 }
 
 

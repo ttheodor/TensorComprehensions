@@ -297,9 +297,10 @@ OptionsCachedEntry::OptionsCachedEntry(
     const std::vector<const DLTensor*>& outputs,
     const std::string& deviceStr,
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     Duration runtime)
     : key(id, inputs, outputs, deviceStr, git_version) {
-  values.emplace_back(options, runtime);
+  values.emplace_back(options, cuda_source, runtime);
 }
 
 OptionsCachedEntry::OptionsCachedEntry(
@@ -308,9 +309,10 @@ OptionsCachedEntry::OptionsCachedEntry(
     const std::vector<const DLTensor*>& outputs,
     const std::string& deviceStr,
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     const CudaProfilingInfo& pInfo)
     : key(id, inputs, outputs, deviceStr, git_version) {
-  values.emplace_back(options, pInfo);
+  values.emplace_back(options, cuda_source, pInfo);
 }
 
 OptionsCachedEntry::OptionsCachedEntry(
@@ -319,10 +321,11 @@ OptionsCachedEntry::OptionsCachedEntry(
     const std::vector<const DLTensor*>& outputs,
     const std::string& deviceStr,
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     Duration runtime,
     const CudaProfilingInfo& pInfo)
     : key(id, inputs, outputs, deviceStr, git_version) {
-  values.emplace_back(options, runtime, pInfo);
+  values.emplace_back(options, cuda_source, runtime, pInfo);
 }
 
 OptionsCachedEntry::Key::Key(
@@ -351,25 +354,35 @@ OptionsCachedEntry::Key::Key(
 
 OptionsCachedEntry::Values::Values(
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     Duration runtime)
-    : mappingOptions(options), recordedRuntimes{runtime} {}
+    : mappingOptions(options),
+      cuda_source(cuda_source),
+      recordedRuntimes{runtime} {}
 
 OptionsCachedEntry::Values::Values(
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     const CudaProfilingInfo& pInfo)
-    : mappingOptions(options), profiles{pInfo} {}
+    : mappingOptions(options), cuda_source(cuda_source), profiles{pInfo} {}
 
 OptionsCachedEntry::Values::Values(
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     Duration runtime,
     const CudaProfilingInfo& pInfo)
-    : mappingOptions(options), recordedRuntimes{runtime}, profiles{pInfo} {}
+    : mappingOptions(options),
+      cuda_source(cuda_source),
+      recordedRuntimes{runtime},
+      profiles{pInfo} {}
 
 OptionsCachedEntry::Values::Values(
     const CudaMappingOptions& options,
+    const std::string& cuda_source,
     std::vector<Duration>&& runtimes,
     std::vector<CudaProfilingInfo>&& pInfos)
     : mappingOptions(options),
+      cuda_source(cuda_source),
       recordedRuntimes(std::move(runtimes)),
       profiles(std::move(pInfos)) {}
 
@@ -421,6 +434,7 @@ OptionsCachedEntry::OptionsCachedEntry(const OptionsCacheEntryProto& buf)
 
     values.emplace_back(
         CudaMappingOptions(value.kernel_options()),
+        value.cuda_source(),
         std::move(runtimes),
         std::move(profiles));
   }
@@ -468,6 +482,7 @@ OptionsCacheEntryProto OptionsCachedEntry::toProtobuf() const {
       [](const Values& v) {
         OptionsCacheValuesProto buf;
         *buf.mutable_kernel_options() = v.mappingOptions.proto();
+        buf.set_cuda_source(v.cuda_source);
         for (const auto& r : v.recordedRuntimes) {
           buf.add_recorded_runtimes(
               std::chrono::duration_cast<std::chrono::microseconds>(r).count());
@@ -526,7 +541,7 @@ void OptionsCache::recordRuntime(
 
   auto kernel = searchKernel(entries_, id, inputs, outputs);
   if (not kernel) {
-    entries_.emplace_back(id, inputs, outputs, gpuStr, options, runtime);
+    entries_.emplace_back(id, inputs, outputs, gpuStr, options, "", runtime);
     return;
   }
   auto v = std::find_if(
@@ -536,7 +551,7 @@ void OptionsCache::recordRuntime(
         return v.mappingOptions == options;
       });
   if (v == kernel->values.end()) {
-    kernel->values.emplace_back(options, runtime);
+    kernel->values.emplace_back(options, "", runtime);
     return;
   }
 
@@ -556,7 +571,7 @@ void OptionsCache::recordProfilingInfo(
   auto kernel = searchKernel(entries_, id, inputs, outputs);
   if (not kernel) {
     entries_.emplace_back(
-        id, inputs, outputs, gpuStr, options, pInfo.runtime, pInfo);
+        id, inputs, outputs, gpuStr, options, "", pInfo.runtime, pInfo);
     return;
   }
   auto v = std::find_if(
@@ -566,7 +581,7 @@ void OptionsCache::recordProfilingInfo(
         return v.mappingOptions == options;
       });
   if (v == kernel->values.end()) {
-    kernel->values.emplace_back(options, pInfo);
+    kernel->values.emplace_back(options, "", pInfo);
     return;
   }
 
