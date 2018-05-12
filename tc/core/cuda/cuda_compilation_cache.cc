@@ -490,6 +490,8 @@ OptionsCacheEntryProto OptionsCachedEntry::toProtobuf() const {
         for (const auto& p : v.profiles) {
           *buf.add_profiles() = toProto(p);
         }
+        *buf.mutable_grid_dims() = v.grid.view.proto;
+        *buf.mutable_block_dims() = v.block.view.proto;
         return buf;
       });
   return buf;

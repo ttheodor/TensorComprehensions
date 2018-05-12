@@ -122,6 +122,8 @@ struct OptionsCachedEntry {
     std::string cuda_source;
     std::vector<Duration> recordedRuntimes;
     std::vector<CudaProfilingInfo> profiles;
+    Grid grid;
+    Block block;
   };
   Key key;
   std::vector<Values> values;

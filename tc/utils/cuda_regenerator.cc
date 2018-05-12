@@ -104,6 +104,8 @@ void generate_cuda(OptionsCache& cache) {
                             lang};
         exec.compile(v.mappingOptions);
         v.cuda_source = exec.cudaSource;
+        v.grid = exec.grid;
+        v.block = exec.block;
       }));
     }
   }
@@ -121,6 +123,7 @@ void generate_cuda(OptionsCache& cache) {
             }),
         jobs.end());
   }
+  std::cout << std::endl;
 }
 
 int main(int argc, char* argv[]) {

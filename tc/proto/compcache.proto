@@ -60,6 +60,8 @@ message OptionsCacheValuesProto{
   repeated CudaProfilingProto profiles = 3;
 
   optional string cuda_source = 8;
+  optional CudaDimProto grid_dims = 10;
+  optional CudaDimProto block_dims = 11;
 }
 
 message OptionsCacheEntryProto {
