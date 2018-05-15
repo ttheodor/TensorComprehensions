@@ -15,6 +15,7 @@ target_link_libraries(
   tc_aten
 
   ${HALIDE_LIBRARIES}
+  ${ATEN_LIBRARIES}
 
   tc_core
 )
