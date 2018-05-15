@@ -345,7 +345,7 @@ void storeTopKInCache(
         << "Dumping cache to " << tc::makeOptionsFilename(cacheFilename)
         << std::endl;
     OptionsCache<Backend> cache(*optionsCache);
-    cache.pruneKeepTopK(tc::FLAGS_tuner_save_best_candidates_count);
+    //cache.pruneKeepTopK(tc::FLAGS_tuner_save_best_candidates_count);
     cache.storeCacheToFile(tc::makeOptionsFilename(cacheFilename));
   }
 }
@@ -505,15 +505,7 @@ Autotuner<Backend, SearchStrategy>::tune(
   });
   while (not tuningHarnessFinished) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    if (sigint_) {
-      std::cerr
-          << "Autotuning will stop after the current iteration has finished."
-          << std::endl;
-      tuningHarness.stopAfterCurrentIteration();
-      tuningHarnessThread.join();
-      storeTopKInCache<Backend>(optionsCache_, cacheFileName);
-    }
-    if (sigterm_) {
+    if (sigterm_ or sigint_) {
       std::cerr << "Autotuning aborted." << std::endl;
       storeTopKInCache<Backend>(optionsCache_, cacheFileName);
       std::abort();

@@ -23,6 +23,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <sys/stat.h>
 
 #include <llvm/ADT/Optional.h>
 
