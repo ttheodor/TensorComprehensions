@@ -138,4 +138,5 @@ message(STATUS "Found glog: ${GLOG_LIBRARIES}")
 # endforeach()
 
 include_directories(BEFORE ${PROJECT_SOURCE_DIR})
+add_subdirectory(third-party/pcg)
 add_subdirectory(tc)
