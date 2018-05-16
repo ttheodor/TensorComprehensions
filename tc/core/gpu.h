@@ -27,11 +27,7 @@ namespace tc {
 /// The call is forwarded to the appropriate GPU driver (CUDA in particular).
 /// If a thread has no associated GPU device, return 0.
 inline size_t querySharedMemorySize() {
-#ifdef CUDA_HOME
-  return CudaGPUInfo::GPUInfo().SharedMemorySize();
-#else
   return 0;
-#endif
 }
 
 } // namespace tc

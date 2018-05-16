@@ -32,6 +32,7 @@ add_library(
   polyhedral/scop.cc
   polyhedral/separation.cc
   polyhedral/unroll.cc
+  cuda/cuda_backend.cc
   cuda/cuda_mapping_options.cc
   cuda/cuda_mapping_options_cpp_printer.cc
   polyhedral/cuda/codegen.cc
@@ -46,7 +47,8 @@ target_link_libraries(
 
   ${HALIDE_LIBRARIES}
   ${ISL_LIBRARIES}
-
+  ${GFLAGS_LIBRARIES} 
+  ${GLOG_LIBRARIES}
   tc_lang
   tc_version
   tc_proto

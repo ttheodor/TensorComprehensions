@@ -31,7 +31,7 @@ void checkInputsCompliant(
 } // namespace detail
 
 template <typename Backend>
-std::unique_ptr<typename Backend::CompilationResultType> compile(
+typename Backend::CompilationResultType compile(
     const std::string& tc,
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
@@ -44,12 +44,11 @@ std::unique_ptr<typename Backend::CompilationResultType> compile(
 }
 
 template <typename Backend>
-std::unique_ptr<typename Backend::CompilationResultType> compile(
+typename Backend::CompilationResultType compile(
     lang::TreeRef tcDefinition,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
     const typename Backend::MappingOptionsType& options) {
-
   auto inputsInfo = makeTensorInfoVector(inputs);
   auto outputsInfo = detail::inferOutputTensorInfo(tcDefinition, inputs);
   auto halideComponents =

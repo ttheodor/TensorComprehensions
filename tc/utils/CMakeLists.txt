@@ -1,0 +1,2 @@
+add_executable(gc_generator group_convolution_generator.cc)
+target_link_libraries(gc_generator PUBLIC tc_core)
