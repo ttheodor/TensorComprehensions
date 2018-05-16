@@ -32,19 +32,10 @@ elseif(${CMAKE_BUILD_TYPE} MATCHES "Release")
 endif()
 message(STATUS "CMAKE_INSTALL_PREFIX is ${CMAKE_INSTALL_PREFIX}")
 
-add_subdirectory(third-party/pybind11)
+#add_subdirectory(third-party/pybind11)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTC_DIR=\"\\\"${TC_DIR}\\\"\" ")
 
-set(LLVM_DIR ${CLANG_PREFIX}/lib/cmake/llvm)
-message(STATUS "Looking for LLVM in ${LLVM_DIR}")
-find_package(LLVM REQUIRED LLVM)
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-
-if (NOT TARGET gtest)
-add_subdirectory(third-party/googletest)
-endif()
 
 # RPATH - how to properly handle rpath https://cmake.org/Wiki/CMake_RPATH_handling
 # RPATH - a list of directories which is linked into the executable, supported on most UNIX systems.
@@ -91,8 +82,6 @@ endif()
 
 # Normal dependencies
 
-# pybind11
-include_directories(third-party/pybind11)
 
 # isl
 find_path(ISL_INCLUDE_DIR NAMES isl)
@@ -105,54 +94,38 @@ message(STATUS "Found isl: ${ISL_LIBRARIES}")
 find_path(ISL_INCLUDE_DIR NAMES dlpack)
 include_directories(${DLPACK_INCLUDE_DIR})
 
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-execute_process(COMMAND ${CLANG_PREFIX}/bin/llvm-config --libdir  OUTPUT_VARIABLE LLVM_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-link_directories(${LLVM_LIBDIR})
-
 # protobuf
 # TODO: check if this respects CMAKE_PREFIX_PATH
 find_package(Protobuf REQUIRED)
 
 ################################################################################
 
-# cuda
-set(WITH_CUDA ON CACHE BOOL "Whether to build with CUDA support")
+find_package(CUDA REQUIRED)
+include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
 
-if(WITH_CUDA)
-  find_package(CUDA REQUIRED)
-  include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
+# modified CUB
+find_path(CUB_INCLUDE_DIR NAMES cub)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_CUDA -DCUDA_HOME=\"\\\"${CUDA_INCLUDE_DIRS}\\\"\" -DCUB_HOME=\"\\\"${CUB_INCLUDE_DIR}\\\"\" ")
 
-  # modified CUB
-  find_path(CUB_INCLUDE_DIR NAMES cub)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_CUDA -DCUDA_HOME=\"\\\"${CUDA_INCLUDE_DIRS}\\\"\" -DCUB_HOME=\"\\\"${CUB_INCLUDE_DIR}\\\"\" ")
+# Inherited from Torch, see
+# https://github.com/torch/cutorch/blob/master/lib/THC/cmake/select_compute_arch.cmake
+INCLUDE(cmake/select_compute_arch.cmake)
+CUDA_SELECT_NVCC_ARCH_FLAGS(NVCC_FLAGS_EXTRA)
 
-  # Inherited from Torch, see
-  # https://github.com/torch/cutorch/blob/master/lib/THC/cmake/select_compute_arch.cmake
-  INCLUDE(cmake/select_compute_arch.cmake)
-  CUDA_SELECT_NVCC_ARCH_FLAGS(NVCC_FLAGS_EXTRA)
+# TODO: Investigate these
+set (CUDA_VERBOSE_BUILD ON)
+set (CUDA_PROPAGATE_HOST_FLAGS ON)
 
-  # TODO: Investigate these
-  set (CUDA_VERBOSE_BUILD ON)
-  set (CUDA_PROPAGATE_HOST_FLAGS ON)
+##############################################################################
+# FindCUDA doesn't find all the libraries we need, add the extra ones
+# Cribbed from /lib64 ${CUDA_TOOLKIT_ROOT_DIR}/lib
+##############################################################################
+find_library(CUDA_CUDA_LIBRARIES cuda
+PATHS ${CUDA_TOOLKIT_ROOT_DIR}
+PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs)
 
-  ##############################################################################
-  # FindCUDA doesn't find all the libraries we need, add the extra ones
-  # Cribbed from /lib64 ${CUDA_TOOLKIT_ROOT_DIR}/lib
-  ##############################################################################
-  find_library(CUDA_CUDA_LIBRARIES cuda
-    PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-    PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs)
+set(CUDA_CUDA_LIBRARY ${CUDA_CUDA_LIBRARIES})
 
-  set(CUDA_CUDA_LIBRARY ${CUDA_CUDA_LIBRARIES})
-
-  # Needed to build C2 and some of our tests
-  INCLUDE(cmake/FindCuDNN.cmake)
-  include_directories(${CUDNN_INCLUDE_DIR})
-else()
-  message(STATUS "Building TC without CUDA support")
-endif()
-
-################################################################################
 
 # Halide
 message(STATUS "Finding Halide")
@@ -164,57 +137,6 @@ message(STATUS "Found Halide.so file: ${HALIDE_LIBRARIES}")
 
 ################################################################################
 
-# Caffe2
-if (WITH_CAFFE2)
-  # eigen - needed inside Caffe2 only
-  # Caffe2 probably used its bundled Eigen (which it didn't install) in this case.
-  message(WARNING "Couldn't find Eigen headers, assuming caffe2 used in-tree headers")
-  include_directories(third-party/caffe2/third_party/eigen)
-
-  find_path(CAFFE2_INCLUDE_DIR NAMES caffe2)
-  include_directories(SYSTEM ${CAFFE2_INCLUDE_DIR})
-  find_library(CAFFE2_CPU_LIBRARIES NAMES caffe2 PATHS ${CMAKE_INSTALL_PREFIX} PATH_SUFFIXES lib lib64)
-  message(STATUS "Found Caffe2_CPU: ${CAFFE2_CPU_LIBRARIES}")
-  if (WITH_CUDA)
-    find_library(CAFFE2_GPU_LIBRARIES NAMES caffe2_gpu PATHS ${CMAKE_INSTALL_PREFIX} PATH_SUFFIXES lib lib64)
-    message(STATUS "Found Caffe2_GPU: ${CAFFE2_GPU_LIBRARIES}")
-  endif()
-else()
-  message(STATUS "Caffe2 installation is turned off")
-endif()
-
-################################################################################
-# ATen
-# first find python path
-execute_process(COMMAND which python OUTPUT_VARIABLE __python OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "PYTHON output: \n${__python}")
-
-# run the import torch command, if torch is installed it returns 0 otherwise error
-execute_process(COMMAND "${__python}" "-c" "import torch;" RESULT_VARIABLE __torch_install OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "IMPORTING TORCH: \n${__torch_install}")
-
-# also get the site-packages path where conda installs pytorch
-execute_process(COMMAND "python" "-c"
-    "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
-    OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "PYTHON site packages: \n${PYTHON_SITE_PACKAGES}")
-
-# if PyTorch is installed, we get libATen.so from there, otherwise build it
-if (__torch_install EQUAL 0)
-  message(STATUS "TORCH INSTALLED, linking to ATen from PyTorch")
-  set(ATEN_INCLUDE_DIR "${PYTHON_SITE_PACKAGES}/torch/lib/include")
-  include_directories(${ATEN_INCLUDE_DIR})
-  find_library(ATEN_LIBRARIES NAMES libATen.so PATHS ${PYTHON_SITE_PACKAGES}/torch/lib)
-  link_directories("${PYTHON_SITE_PACKAGES}/../../")
-  message(STATUS "Found ATen.so file: ${ATEN_LIBRARIES}")
-else()
-  message(STATUS "TORCH NOT INSTALLED, linking to ATen separately")
-  message(STATUS "Finding ATen")
-  find_path(ATEN_INCLUDE_DIR NAMES ATen)
-  include_directories(${ATEN_INCLUDE_DIR})
-  find_library(ATEN_LIBRARIES NAMES ATen PATHS ${CMAKE_INSTALL_PREFIX} PATH_SUFFIXES lib lib64)
-  message(STATUS "Found ATen.so file: ${ATEN_LIBRARIES}")
-endif()
 
 ################################################################################
 
@@ -233,10 +155,6 @@ message(STATUS "Found gflags: ${GFLAGS_LIBRARIES}")
 # For some reason, the world wants to redefine the glog macros with the same
 # name. For now, we use glog everywhere, also force DMLC/CAFFE2  to use glog
 add_definitions(-DDMLC_USE_GLOG)
-if (WITH_CAFFE2)
-  add_definitions(-DCAFFE2_USE_GOOGLE_GLOG)
-endif()
-
 find_library(GLOG_LIBRARIES glog HINTS ${CMAKE_INSTALL_PREFIX} PATH_SUFFIXES lib lib64)
 message(STATUS "Found glog: ${GLOG_LIBRARIES}")
 
@@ -248,26 +166,3 @@ message(STATUS "Found glog: ${GLOG_LIBRARIES}")
 
 include_directories(BEFORE ${PROJECT_SOURCE_DIR})
 add_subdirectory(tc)
-
-# At the moment pybind is only supported in CUDA mode and compilation fails
-# for non-CUDA mode (CUDA_HOME and CUB_HOME undefined error).
-# Once the core CPU mapper is stabilized we can worry about pybind, deactivate
-# conditionally for now
-if (WITH_CUDA)
-  add_subdirectory(tensor_comprehensions/pybinds)
-endif()
-
-enable_testing()
-add_subdirectory(test)
-
-if (WITH_CUDA)
-  add_subdirectory(tc/examples)
-else()
-  message(STATUS "Not building examples, CUDA not available")
-endif()
-
-if (WITH_CAFFE2 AND WITH_CUDA)
-  add_subdirectory(tc/benchmarks)
-else()
-  message(STATUS "Not building benchmarks, caffe2 or CUDA not available")
-endif()
