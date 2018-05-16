@@ -100,33 +100,6 @@ find_package(Protobuf REQUIRED)
 
 ################################################################################
 
-find_package(CUDA REQUIRED)
-include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
-
-# modified CUB
-find_path(CUB_INCLUDE_DIR NAMES cub)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_CUDA -DCUDA_HOME=\"\\\"${CUDA_INCLUDE_DIRS}\\\"\" -DCUB_HOME=\"\\\"${CUB_INCLUDE_DIR}\\\"\" ")
-
-# Inherited from Torch, see
-# https://github.com/torch/cutorch/blob/master/lib/THC/cmake/select_compute_arch.cmake
-INCLUDE(cmake/select_compute_arch.cmake)
-CUDA_SELECT_NVCC_ARCH_FLAGS(NVCC_FLAGS_EXTRA)
-
-# TODO: Investigate these
-set (CUDA_VERBOSE_BUILD ON)
-set (CUDA_PROPAGATE_HOST_FLAGS ON)
-
-##############################################################################
-# FindCUDA doesn't find all the libraries we need, add the extra ones
-# Cribbed from /lib64 ${CUDA_TOOLKIT_ROOT_DIR}/lib
-##############################################################################
-find_library(CUDA_CUDA_LIBRARIES cuda
-PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs)
-
-set(CUDA_CUDA_LIBRARY ${CUDA_CUDA_LIBRARIES})
-
-
 # Halide
 message(STATUS "Finding Halide")
 find_path(HALIDE_INCLUDE_DIR NAMES Halide.h)
