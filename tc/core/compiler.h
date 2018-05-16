@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include <chrono>
 #include <map>
 #include <string>
 #include <vector>
@@ -22,6 +23,24 @@
 #include "tc/core/mapping_options.h"
 #include "tc/core/tensor.h"
 #include "tc/lang/tree.h"
+
+using D = std::chrono::high_resolution_clock::duration;
+
+D readMakeInputInfoOverhead();
+D readInferOutputOverhead();
+D readToHalideOverhead();
+D readMapperOverhead();
+D readNvrctOverhead();
+D readGpuRuntime();
+D readCpuOverhead();
+
+void addToMakeInputInfoOverhead(D);
+void addToInferOutputOverhead(D);
+void addToToHalideOverhead(D);
+void addToMapperOverhead(D);
+void addToNvrctOverhead(D);
+void addToGpuRuntime(D);
+void addToCpuOverhead(D);
 
 /**
  * This provides a simple functional-style C++ API with multi-backend

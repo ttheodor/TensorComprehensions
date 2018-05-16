@@ -84,4 +84,22 @@ def group_convolution(float(N,G,C,H,W) I, float(G,F,C,KH,KW) W1, float(G,F) B)
       FLAGS_save_tuner_proto_prefix + std::string("/group_convolution_cache") +
           suffix,
       fixer);
+
+  using namespace std;
+  using namespace chrono;
+  std::cout << "Make input info: "
+            << duration_cast<milliseconds>(readMakeInputInfoOverhead()).count()
+            << "ms\nInfer output: "
+            << duration_cast<milliseconds>(readInferOutputOverhead()).count()
+            << "ms\nHalide: "
+            << duration_cast<milliseconds>(readToHalideOverhead()).count()
+            << "ms\nMapper: "
+            << duration_cast<milliseconds>(readMapperOverhead()).count()
+            << "ms\nNVRTC: "
+            << duration_cast<milliseconds>(readNvrctOverhead()).count()
+            << "ms\nCpu overhead: "
+            << duration_cast<milliseconds>(readCpuOverhead()).count()
+            << "ms\nGpu runtime: "
+            << duration_cast<milliseconds>(readGpuRuntime()).count() << "ms"
+            << std::endl;
 }

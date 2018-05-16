@@ -15,6 +15,7 @@
  */
 #include "tc/core/compiler.h"
 
+#include <mutex>
 #include <sstream>
 #include <string>
 
@@ -22,6 +23,89 @@
 #include "tc/core/halide_utils.h"
 #include "tc/core/tensor.h"
 #include "tc/lang/canonicalize.h"
+
+namespace {
+std::mutex makeInputInfoOverhead_;
+D makeInputInfoOverhead = D::zero();
+std::mutex inferOutputOverhead_;
+D inferOutputOverhead = D::zero();
+std::mutex toHalideOverhead_;
+D toHalideOverhead = D::zero();
+std::mutex mapperOverhead_;
+D mapperOverhead = D::zero();
+std::mutex nvrctOverhead_;
+D nvrctOverhead = D::zero();
+std::mutex cpuOverhead_;
+D cpuOverhead = D::zero();
+std::mutex gpuRuntime_;
+D gpuRuntime = D::zero();
+} // namespace
+
+D readMakeInputInfoOverhead() {
+  std::lock_guard<std::mutex> lock(makeInputInfoOverhead_);
+  return makeInputInfoOverhead;
+}
+D readInferOutputOverhead() {
+  std::lock_guard<std::mutex> lock(inferOutputOverhead_);
+  return inferOutputOverhead;
+}
+D readToHalideOverhead() {
+  std::lock_guard<std::mutex> lock(toHalideOverhead_);
+  return toHalideOverhead;
+}
+D readMapperOverhead() {
+  std::lock_guard<std::mutex> lock(mapperOverhead_);
+  return mapperOverhead;
+}
+D readNvrctOverhead() {
+  std::lock_guard<std::mutex> lock(nvrctOverhead_);
+  return nvrctOverhead;
+}
+
+D readCpuOverhead() {
+  std::lock_guard<std::mutex> lock(cpuOverhead_);
+  return cpuOverhead;
+}
+
+D readGpuRuntime() {
+  std::lock_guard<std::mutex> lock(gpuRuntime_);
+  return gpuRuntime;
+}
+
+void addToMakeInputInfoOverhead(D d) {
+  std::lock_guard<std::mutex> lock(makeInputInfoOverhead_);
+  makeInputInfoOverhead += d;
+}
+
+void addToInferOutputOverhead(D d) {
+  std::lock_guard<std::mutex> lock(inferOutputOverhead_);
+  inferOutputOverhead += d;
+}
+
+void addToToHalideOverhead(D d) {
+  std::lock_guard<std::mutex> lock(toHalideOverhead_);
+  toHalideOverhead += d;
+}
+
+void addToMapperOverhead(D d) {
+  std::lock_guard<std::mutex> lock(mapperOverhead_);
+  mapperOverhead += d;
+}
+
+void addToNvrctOverhead(D d) {
+  std::lock_guard<std::mutex> lock(nvrctOverhead_);
+  nvrctOverhead += d;
+}
+
+void addToCpuOverhead(D d) {
+  std::lock_guard<std::mutex> lock(cpuOverhead_);
+  cpuOverhead += d;
+}
+
+void addToGpuRuntime(D d) {
+  std::lock_guard<std::mutex> lock(gpuRuntime_);
+  gpuRuntime += d;
+}
 
 namespace tc {
 std::vector<TensorInfo> inferOutputTensorInfo(

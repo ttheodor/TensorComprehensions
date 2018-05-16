@@ -51,19 +51,32 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
     const typename Backend::MappingOptionsType& options) {
   using CompilationResultType = typename Backend::CompilationResultType;
 
+  auto t0 = std::chrono::high_resolution_clock::now();
   auto inputsInfo = makeTensorInfoVector(inputs);
+  auto t1 = std::chrono::high_resolution_clock::now();
+  addToMakeInputInfoOverhead(t1 - t0);
+  t0 = std::chrono::high_resolution_clock::now();
   auto outputsInfo = detail::inferOutputTensorInfo(tcDefinition, inputs);
+  t1 = std::chrono::high_resolution_clock::now();
+  addToInferOutputOverhead(t1 - t0);
+  t0 = std::chrono::high_resolution_clock::now();
   auto halideComponents =
       tc2halide::translate(isl::with_exceptions::globalIslCtx(), tcDefinition);
+  t1 = std::chrono::high_resolution_clock::now();
+  addToToHalideOverhead(t1 - t0);
   detail::checkInputsCompliant(halideComponents, inputs);
 
   auto tcName = lang::Def(tcDefinition).name().name();
+  t0 = std::chrono::high_resolution_clock::now();
   CompilationResultType compilationResult = Backend::compileWithTcMapper(
       tcName,
       halideComponents,
       inputs,
       /* TODO outputs, */
       options);
+  t1 = std::chrono::high_resolution_clock::now();
+  addToMapperOverhead(t1 - t0);
+
   return std::unique_ptr<typename Backend::ExecutorType>(
       new typename Backend::ExecutorType(
           inputsInfo, outputsInfo, halideComponents, compilationResult));

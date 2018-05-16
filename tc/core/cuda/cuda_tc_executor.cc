@@ -21,6 +21,8 @@
 #include "tc/core/tc2halide.h"
 #include "tc/core/tensor.h"
 
+#include "tc/core/compiler.h"
+
 #include "tc/lang/parser.h"
 #include "tc/lang/sema.h"
 
@@ -58,9 +60,11 @@ CudaTcExecutor::CudaTcExecutor(
   this->clearRuntimeCompiledFunction();
   rtcFun_ = CudaRTCFunction::Compile(
       compilationResult.specializedName, compilationResult.source);
+
   grid_ = compilationResult.grid;
   block_ = compilationResult.block;
   auto t1 = std::chrono::high_resolution_clock::now();
+  addToNvrctOverhead(t1 - t0);
   LOG_IF(INFO, FLAGS_debug_tc_mapper)
       << "[COMPILE] Compiling with host JIT compiler took: "
       << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()
@@ -146,6 +150,8 @@ ProfilingInfo CudaTcExecutor::profileUnchecked(
   // The CPU overhead is the total time minus the (synchronized) kernel runtime
   Duration cpuOverhead(Duration::since(start));
   cpuOverhead = cpuOverhead - kernelRuntime;
+  addToCpuOverhead(std::chrono::microseconds(cpuOverhead.toMicroSeconds()));
+  addToGpuRuntime(std::chrono::microseconds(kernelRuntime.toMicroSeconds()));
   return ProfilingInfo{cpuOverhead, kernelRuntime};
 }
 } // namespace tc
