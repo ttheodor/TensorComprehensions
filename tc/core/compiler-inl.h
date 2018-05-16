@@ -31,7 +31,7 @@ void checkInputsCompliant(
 } // namespace detail
 
 template <typename Backend>
-std::unique_ptr<typename Backend::ExecutorType> compile(
+std::unique_ptr<typename Backend::CompilationResultType> compile(
     const std::string& tc,
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
@@ -44,12 +44,11 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
 }
 
 template <typename Backend>
-std::unique_ptr<typename Backend::ExecutorType> compile(
+std::unique_ptr<typename Backend::CompilationResultType> compile(
     lang::TreeRef tcDefinition,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
     const typename Backend::MappingOptionsType& options) {
-  using CompilationResultType = typename Backend::CompilationResultType;
 
   auto inputsInfo = makeTensorInfoVector(inputs);
   auto outputsInfo = detail::inferOutputTensorInfo(tcDefinition, inputs);
@@ -58,14 +57,11 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
   detail::checkInputsCompliant(halideComponents, inputs);
 
   auto tcName = lang::Def(tcDefinition).name().name();
-  CompilationResultType compilationResult = Backend::compileWithTcMapper(
+  return Backend::compileWithTcMapper(
       tcName,
       halideComponents,
       inputs,
       /* TODO outputs, */
       options);
-  return std::unique_ptr<typename Backend::ExecutorType>(
-      new typename Backend::ExecutorType(
-          inputsInfo, outputsInfo, halideComponents, compilationResult));
 }
 } // namespace tc
