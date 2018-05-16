@@ -18,10 +18,8 @@
 #include <string>
 #include <vector>
 
-#include "tc/core/cuda/cuda.h"
 #include "tc/core/cuda/cuda_mapping_options.h"
 #include "tc/core/cuda/cuda_mapping_options_cpp_printer.h"
-#include "tc/core/cuda/cuda_rtc.h"
 #include "tc/core/halide_utils.h"
 #include "tc/core/tensor.h"
 
@@ -44,7 +42,7 @@ struct CudaCompilationResult {
  * synchronization information of a kernel.
  */
 struct CudaRuntimeInformation {
-  cudaStream_t stream{0};
+  //cudaStream_t stream{0};
 };
 
 struct CudaTcExecutor;
@@ -59,15 +57,15 @@ struct CudaBackend {
   using CompilationResultType = CudaCompilationResult;
   using OptionsCacheProtoType = CudaOptionsCacheProto;
   using OptionsCacheValueProtoType = CudaOptionsCacheValueProto;
-  using RTCFunctionType = CudaRTCFunction;
+  //using RTCFunctionType = CudaRTCFunction;
 
-  using WithDevice = WithCudaDevice;
-  using RuntimeInformation = CudaRuntimeInformation;
+  //using WithDevice = WithCudaDevice;
+  //using RuntimeInformation = CudaRuntimeInformation;
   using MappingOptionsAsCpp = CudaMappingOptionsAsCpp;
   using MappingOptionsCppPrinter = CudaMappingOptionsCppPrinter;
 
   static inline std::string backendString() {
-    return CudaGPUInfo::GPUInfo().getCudaDeviceStr();
+    return "Bla";
   }
   static inline std::string makeDeviceFilename(const std::string& fn) {
     return fn + ".cuda";

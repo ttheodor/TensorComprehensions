@@ -14,7 +14,7 @@ endif()
 
 add_library(
   tc_autotuner
-  SHARED
+  STATIC
   ${AUTOTUNER_FILES}
 )
 

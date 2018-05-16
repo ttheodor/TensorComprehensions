@@ -67,7 +67,7 @@ namespace tc {
 /// \returns a new TcExecutor on which the run method can be called to run
 /// entryPoint
 template <typename Backend>
-std::unique_ptr<typename Backend::ExecutorType> compile(
+typename Backend::CompilationResultType compile(
     const std::string& tc,
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
@@ -101,7 +101,7 @@ std::map<std::string, lang::TreeRef> parse(const std::string& tc);
 /// sizes.
 /// \returns a new TcExecutor on which the run method can be called
 template <typename Backend>
-std::unique_ptr<typename Backend::ExecutorType> compile(
+typename Backend::CompilationResultType compile(
     lang::TreeRef tcDefinition,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */

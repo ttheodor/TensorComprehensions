@@ -12,11 +12,6 @@
 	url = https://github.com/halide/Halide.git
 
 # Temporary hack
-[submodule "third-party/caffe2"]
-	path = third-party/caffe2
-	url = https://github.com/skimo-openhub/caffe2.git
-
-# Mainstream branches, we don't modify those
 [submodule "third-party/gflags"]
 	path = third-party/gflags
 	url = https://github.com/gflags/gflags
@@ -32,6 +27,3 @@
 [submodule "third-party/pybind11"]
  	path = third-party/pybind11
 	url = https://github.com/pybind/pybind11.git
-[submodule "third-party/pytorch"]
-	path = third-party/pytorch
-	url = https://github.com/pytorch/pytorch.git

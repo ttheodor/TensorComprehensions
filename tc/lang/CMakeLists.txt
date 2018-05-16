@@ -1,8 +1,7 @@
 
 add_library(
   tc_lang
-
-  SHARED
+  STATIC
 
   parser.cc
   lexer.cc
