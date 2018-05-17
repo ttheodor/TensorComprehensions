@@ -17,6 +17,8 @@ message KernelInfo {
   required string git_version = 10;
   //in milliseconds 
   required uint64 compilation_time = 11;
+
+  required uint64 id = 12;
 }
 
 message AotBuf{

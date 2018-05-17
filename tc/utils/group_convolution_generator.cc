@@ -193,6 +193,7 @@ tc::KernelInfo makeKernelInfo(
   ki.set_compilation_time(
       std::chrono::duration_cast<std::chrono::milliseconds>(compilation_time)
           .count());
+  ki.set_id(0);
   return ki;
 }
 
@@ -251,6 +252,20 @@ int main(int argc, char* argv[]) {
   for (auto& t : workers) {
     t.join();
   }
+  std::unordered_set<uint64_t> used_ids;
+  for (const auto& ki : kis.kernels()) {
+    if (ki.id() != 0) {
+      used_ids.insert(ki.id());
+    }
+  }
+  uint64_t id = 0;
+  for (int i = 0; i < kis.kernels_size(); ++i) {
+    while (used_ids.count(id) > 0) {
+      ++id;
+    }
+    kis.mutable_kernels(i)->set_id(id++);
+  }
+
   std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
   if (not kis.SerializeToOstream(&output)) {
     std::cout << "Serialization failed" << std::endl;
