@@ -71,8 +71,8 @@ class OptionsGenerator {
                        .outerScheduleFusionStrategy(makeFusionStrategy())
                        .intraTileScheduleFusionStrategy(makeFusionStrategy())
                        .tile(makeTiles())
-                       .mapToThreads(makeCudaDim())
-                       .mapToBlocks(makeCudaDim())
+                       .mapToThreads(makeBlock())
+                       .mapToBlocks(makeGrid())
                        .tileImperfectlyNested(makeBool())
                        .useSharedMemory(makeBool());
     options.unrollCopyShared(
@@ -109,12 +109,52 @@ class OptionsGenerator {
   uint64_t oneToMaxSize() {
     return std::uniform_int_distribution<uint64_t>{1, maxSize}(rng);
   }
-
   std::vector<uint64_t> makeCudaDim() {
     auto n = std::uniform_int_distribution<uint64_t>{1, 3}(rng);
     std::vector<uint64_t> sizes(n);
     std::generate_n(sizes.begin(), n, [this]() { return oneToMaxSize(); });
     return sizes;
+  }
+
+  std::vector<uint64_t> makeBlock() {
+    auto check = [](const std::vector<uint64_t>& v) {
+      switch (v.size()) {
+        case 1:
+          return v[0] <= 1024;
+        case 2:
+          return v[0] <= 1024 and v[1] <= 1024 and v[0] * v[1] <= 1024;
+        case 3:
+          return v[0] <= 1024 and v[1] <= 1024 and v[2] <= 64 and
+              v[0] * v[1] * v[2] <= 1024;
+        default:
+          return false;
+      }
+    };
+    while (true) {
+      auto v = makeCudaDim();
+      if (check(v))
+        return v;
+    }
+  }
+
+  std::vector<uint64_t> makeGrid() {
+    auto check = [](const std::vector<uint64_t>& v) {
+      switch (v.size()) {
+        case 1:
+          return v[0] < 2147483648;
+        case 2:
+          return v[0] < 2147483648 and v[1] < 65536;
+        case 3:
+          return v[0] < 2147483648 and v[1] < 65536 and v[2] < 65536;
+        default:
+          return false;
+      }
+    };
+    while (true) {
+      auto v = makeCudaDim();
+      if (check(v))
+        return v;
+    }
   }
 
   bool makeBool() {
