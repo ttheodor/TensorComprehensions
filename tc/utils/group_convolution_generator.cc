@@ -243,12 +243,23 @@ bool stillGoodAfterTighening(const tc::CudaCompilationResult& res) {
   return true;
 }
 
+auto loadProto(const std::string& filename) {
+  tc::AotBuf kis;
+  std::ifstream in{filename, std::ios::binary};
+  if (not kis.ParseFromIstream(&in)) {
+    throw std::invalid_argument{"Could input parse protobuf."};
+  }
+  return kis;
+}
+
 int main(int argc, char* argv[]) {
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
+  tc::AotBuf kis;
   if (std::filesystem::exists(FLAGS_output)) {
-    std::cout << FLAGS_output << " already exists" << std::endl;
-    return 1;
+    std::cout << FLAGS_output << " already exists. Will reload and override."
+              << std::endl;
+    kis = loadProto(FLAGS_output);
   }
 
   auto gc_tc = tc::makeGroupConvolution2DTc(1, 1);
@@ -262,7 +273,6 @@ int main(int argc, char* argv[]) {
   using namespace std;
   using namespace chrono;
   std::mutex mtx;
-  tc::AotBuf kis;
   std::vector<std::thread> workers;
   auto perThreadWork = static_cast<uint64_t>(
       std::llround(FLAGS_number / static_cast<float>(FLAGS_threads)));
