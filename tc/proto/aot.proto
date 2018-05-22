@@ -19,6 +19,9 @@ message KernelInfo {
   required uint64 compilation_time = 11;
 
   required uint64 id = 12;
+
+  //in microseconds 
+  repeated uint64 runtimes = 13;
 }
 
 message AotBuf{

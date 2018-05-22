@@ -69,17 +69,17 @@ class OptionsGenerator {
   tc::CudaMappingOptions operator()() {
     auto options = tc::CudaMappingOptions::makeNaiveMappingOptions()
                        .outerScheduleFusionStrategy(makeFusionStrategy())
+                       .outerScheduleAllowSkewing(true)
                        .intraTileScheduleFusionStrategy(makeFusionStrategy())
+                       .intraTileScheduleAllowSkewing(true)
                        .tile(makeTiles())
                        .mapToThreads(makeBlock())
                        .mapToBlocks(makeGrid())
                        .tileImperfectlyNested(makeBool())
+                       .unroll(makeUnroll())
                        .useSharedMemory(makeBool());
     options.unrollCopyShared(
         options.proto().use_shared_memory() ? makeBool() : false);
-    if (makeBool()) {
-      options.unroll(makeUnroll());
-    }
 
     return options;
   };
@@ -98,11 +98,11 @@ class OptionsGenerator {
   }
 
   std::vector<uint64_t> makeTiles() {
-    auto n = std::uniform_int_distribution<uint64_t>{1, 3}(rng);
-    std::vector<uint64_t> sizes(n);
-    std::generate_n(sizes.begin(), n, [this]() {
-      return std::uniform_int_distribution<uint64_t>{0, maxSize}(rng);
-    });
+    std::vector<uint64_t> sizes(3);
+    sizes[0] = 1;
+    sizes[1] = 1;
+    sizes[2] = std::uniform_int_distribution<uint64_t>{0, maxSize}(rng);
+
     return sizes;
   }
 
@@ -110,49 +110,37 @@ class OptionsGenerator {
     return std::uniform_int_distribution<uint64_t>{1, maxSize}(rng);
   }
   std::vector<uint64_t> makeCudaDim() {
-    auto n = std::uniform_int_distribution<uint64_t>{1, 3}(rng);
-    std::vector<uint64_t> sizes(n);
-    std::generate_n(sizes.begin(), n, [this]() { return oneToMaxSize(); });
+    std::vector<uint64_t> sizes(3);
+    std::generate_n(sizes.begin(), 3, [this]() { return oneToMaxSize(); });
     return sizes;
   }
 
   std::vector<uint64_t> makeBlock() {
-    auto check = [](const std::vector<uint64_t>& v) {
-      switch (v.size()) {
-        case 1:
-          return v[0] <= 1024;
-        case 2:
-          return v[0] <= 1024 and v[1] <= 1024 and v[0] * v[1] <= 1024;
-        case 3:
-          return v[0] <= 1024 and v[1] <= 1024 and v[2] <= 64 and
-              v[0] * v[1] * v[2] <= 1024;
-        default:
-          return false;
-      }
+    auto valid = [](const std::vector<uint64_t>& v) {
+      return v[0] <= 1024 and v[1] <= 1024 and v[2] <= 64 and
+          v[0] * v[1] * v[2] <= 1024;
+    };
+    auto min32 = [](const std::vector<uint64_t>& v) {
+      return v[0] * v[1] * v[2] >= 32;
     };
     while (true) {
       auto v = makeCudaDim();
-      if (check(v))
+      if (valid(v) and min32(v))
         return v;
     }
   }
 
   std::vector<uint64_t> makeGrid() {
     auto check = [](const std::vector<uint64_t>& v) {
-      switch (v.size()) {
-        case 1:
-          return v[0] < 2147483648;
-        case 2:
-          return v[0] < 2147483648 and v[1] < 65536;
-        case 3:
-          return v[0] < 2147483648 and v[1] < 65536 and v[2] < 65536;
-        default:
-          return false;
-      }
+      return v[0] < 2147483648 and v[1] < 65536 and v[2] < 65536;
+    };
+    // there are 56 SMs on a P100
+    auto min56 = [](const std::vector<uint64_t>& v) {
+      return v[0] * v[1] * v[2] >= 56;
     };
     while (true) {
       auto v = makeCudaDim();
-      if (check(v))
+      if (check(v) and min56(v))
         return v;
     }
   }
@@ -237,6 +225,24 @@ tc::KernelInfo makeKernelInfo(
   return ki;
 }
 
+uint64_t threadsPerBlock(const tc::Block& b) {
+  return b.view.proto.x() * b.view.proto.y() * b.view.proto.z();
+}
+uint64_t blocksPerGrid(const tc::Grid& g) {
+  return g.view.proto.x() * g.view.proto.y() * g.view.proto.z();
+}
+
+bool stillGoodAfterTighening(const tc::CudaCompilationResult& res) {
+  auto t = threadsPerBlock(res.block);
+  if (t < 32)
+    return false;
+  auto b = blocksPerGrid(res.grid);
+
+  if (b < 56)
+    return false;
+  return true;
+}
+
 int main(int argc, char* argv[]) {
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
@@ -251,14 +257,15 @@ int main(int argc, char* argv[]) {
   auto DL = tc::extractRawPtrs(DLU);
   auto outputsInfo = tc::inferOutputTensorInfo(gc_tc, "group_convolution", DL);
 
-  std::atomic_size_t c{0};
+  std::atomic_size_t tries{0};
+  std::atomic_size_t successes{0};
   using namespace std;
   using namespace chrono;
   std::mutex mtx;
   tc::AotBuf kis;
   std::vector<std::thread> workers;
-  auto perThreadWork =
-      std::llround(FLAGS_number / static_cast<float>(FLAGS_threads));
+  auto perThreadWork = static_cast<uint64_t>(
+      std::llround(FLAGS_number / static_cast<float>(FLAGS_threads)));
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     auto numberOptions = t < FLAGS_threads - 1
         ? perThreadWork
@@ -266,25 +273,54 @@ int main(int argc, char* argv[]) {
     workers.emplace_back([numberOptions,
                           &inputsInfo,
                           &outputsInfo,
-                          &c,
+                          &tries,
+                          &successes,
                           &gc_tc,
                           &DL,
                           &kis,
                           &mtx]() {
-      auto options = generaterUniqueOptions(numberOptions, inputsInfo);
-      for (const auto opts : options) {
-        std::cout << "Compiling... " << c.fetch_add(1) << std::endl;
-        auto t0 = high_resolution_clock::now();
-        auto res =
-            tc::compile<tc::CudaBackend>(gc_tc, "group_convolution", DL, opts);
-        auto t1 = high_resolution_clock::now();
-        auto compilation_time = t1 - t0;
-        std::cout << "Compilation time: "
-                  << duration_cast<milliseconds>(compilation_time).count()
-                  << "ms" << std::endl;
-        std::lock_guard<std::mutex> lock{mtx};
-        *kis.add_kernels() = makeKernelInfo(
-            res, gc_tc, inputsInfo, outputsInfo, opts, compilation_time);
+      std::vector<tc::KernelInfo> kernelIs;
+      std::unordered_set<tc::CudaMappingOptions, OptionsHash> used_options;
+      while (kernelIs.size() < numberOptions) {
+        auto options =
+            generaterUniqueOptions(numberOptions - kernelIs.size(), inputsInfo);
+        for (const auto opts : options) {
+          if (used_options.count(opts) > 0) {
+            continue;
+          }
+          std::cout << "Compilation attempts: " << tries.fetch_add(1)
+                    << " Successes: " << successes.load() << std::endl;
+          auto t0 = high_resolution_clock::now();
+          auto res = tc::compile<tc::CudaBackend>(
+              gc_tc, "group_convolution", DL, opts);
+          auto t1 = high_resolution_clock::now();
+          auto compilation_time = t1 - t0;
+          std::cout << "Compilation time: "
+                    << duration_cast<milliseconds>(compilation_time).count()
+                    << "ms" << std::endl;
+          if (not stillGoodAfterTighening(res)) {
+            // std::cout << "Not enough threads and/or blocks. Discarding... "
+            //<< std::endl;
+            // std::cout << tc::CudaMappingOptionsAsCpp(opts) << std::endl;
+            // std::cout << res.grid.view.proto.x() << ' '
+            //<< res.grid.view.proto.y() << ' '
+            //<< res.grid.view.proto.z() << std::endl;
+            // std::cout << res.block.view.proto.x() << ' '
+            //<< res.block.view.proto.y() << ' '
+            //<< res.block.view.proto.z() << std::endl;
+            // std::cout << res.source << std::endl;
+            continue;
+          }
+          ++successes;
+
+          used_options.insert(opts);
+          kernelIs.push_back(makeKernelInfo(
+              res, gc_tc, inputsInfo, outputsInfo, opts, compilation_time));
+        }
+      }
+      std::lock_guard<std::mutex> lock{mtx};
+      for (auto& k : kernelIs) {
+        *kis.add_kernels() = std::move(k);
       }
     });
   }
