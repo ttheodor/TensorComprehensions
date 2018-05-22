@@ -62,7 +62,7 @@ endfunction()
 
 tc_protobuf_generate_cpp_py(${PROJECT_SOURCE_DIR}/tc/proto PROTO_SRCS PROTO_HDRS PROTO_PY mapping_options.proto compcache.proto aot.proto)
 
-add_library(tc_proto SHARED ${PROTO_SRCS} ${PROTO_HDRS})
+add_library(tc_proto STATIC ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(tc_proto ${PROTOBUF_LIBRARIES})
 target_include_directories(tc_proto PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_HDRS})
 

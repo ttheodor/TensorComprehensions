@@ -7,7 +7,7 @@
 add_library(
   tc_core
 
-  SHARED
+  STATIC
 
   flags.cc
   mapping_options.cc
