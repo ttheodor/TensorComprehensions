@@ -1,6 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -197,12 +198,14 @@ std::vector<tc::TensorInfo> makeTensorInfo() {
 
 tc::KernelInfo makeKernelInfo(
     const tc::CudaCompilationResult& res,
+    uint64_t id,
     const std::string& tc,
     const std::vector<tc::TensorInfo>& inputsInfo,
     const std::vector<tc::TensorInfo>& outputsInfo,
     const tc::CudaMappingOptions& opts,
     const std::chrono::high_resolution_clock::duration& compilation_time) {
   tc::KernelInfo ki;
+  ki.set_id(id);
   ki.set_tc(tc);
   for (const auto& i : inputsInfo) {
     *ki.add_inputs() = i.toProtobuf();
@@ -255,7 +258,7 @@ auto loadProto(const std::string& filename) {
 int main(int argc, char* argv[]) {
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
-  tc::AotBuf kis;
+  static tc::AotBuf kis;
   if (std::filesystem::exists(FLAGS_output)) {
     std::cout << FLAGS_output << " already exists. Will reload and override."
               << std::endl;
@@ -267,6 +270,17 @@ int main(int argc, char* argv[]) {
   auto DLU = tc::makeDLConstTensorVector(inputsInfo);
   auto DL = tc::extractRawPtrs(DLU);
   auto outputsInfo = tc::inferOutputTensorInfo(gc_tc, "group_convolution", DL);
+
+  std::unordered_set<uint64_t> used_ids;
+  for (const auto& ki : kis.kernels()) {
+    if (ki.id() != 0) {
+      used_ids.insert(ki.id());
+    }
+  }
+
+  uint64_t id = 0;
+  for (int i = 0; i < kis.kernels_size(); ++i) {
+  }
 
   std::atomic_size_t tries{0};
   std::atomic_size_t successes{0};
@@ -287,13 +301,15 @@ int main(int argc, char* argv[]) {
                           &successes,
                           &gc_tc,
                           &DL,
-                          &kis,
+                          &id,
+                          &used_ids,
                           &mtx]() {
       std::vector<tc::KernelInfo> kernelIs;
+      uint64_t nKernels = 0;
       std::unordered_set<tc::CudaMappingOptions, OptionsHash> used_options;
-      while (kernelIs.size() < numberOptions) {
+      while (nKernels < numberOptions) {
         auto options =
-            generaterUniqueOptions(numberOptions - kernelIs.size(), inputsInfo);
+            generaterUniqueOptions(numberOptions - nKernels, inputsInfo);
         for (const auto opts : options) {
           if (used_options.count(opts) > 0) {
             continue;
@@ -322,40 +338,40 @@ int main(int argc, char* argv[]) {
             continue;
           }
           ++successes;
-
           used_options.insert(opts);
-          kernelIs.push_back(makeKernelInfo(
-              res, gc_tc, inputsInfo, outputsInfo, opts, compilation_time));
+          ++nKernels;
+          std::lock_guard<std::mutex> lock{mtx};
+          while (used_ids.count(id) > 0) {
+            ++id;
+          }
+          used_ids.insert(id);
+          *kis.add_kernels() = makeKernelInfo(
+              res, id, gc_tc, inputsInfo, outputsInfo, opts, compilation_time);
+          ++id;
         }
-      }
-      std::lock_guard<std::mutex> lock{mtx};
-      for (auto& k : kernelIs) {
-        *kis.add_kernels() = std::move(k);
       }
     });
   }
+  static auto write_proto = []() {
+    std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
+    if (not kis.SerializeToOstream(&output)) {
+      std::cout << "Serialization failed" << std::endl;
+    }
+  };
+
+  auto handler = [](int) {
+    write_proto();
+    std::abort();
+  };
+
+  std::signal(SIGINT, handler);
+  std::signal(SIGTERM, handler);
+  std::signal(SIGKILL, handler);
 
   for (auto& t : workers) {
     t.join();
   }
-  std::unordered_set<uint64_t> used_ids;
-  for (const auto& ki : kis.kernels()) {
-    if (ki.id() != 0) {
-      used_ids.insert(ki.id());
-    }
-  }
-  uint64_t id = 0;
-  for (int i = 0; i < kis.kernels_size(); ++i) {
-    while (used_ids.count(id) > 0) {
-      ++id;
-    }
-    kis.mutable_kernels(i)->set_id(id++);
-  }
+  write_proto();
 
-  std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
-  if (not kis.SerializeToOstream(&output)) {
-    std::cout << "Serialization failed" << std::endl;
-    return 2;
-  }
   return 0;
 }
