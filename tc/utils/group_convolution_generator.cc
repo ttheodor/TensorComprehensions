@@ -224,7 +224,6 @@ tc::KernelInfo makeKernelInfo(
   ki.set_compilation_time(
       std::chrono::duration_cast<std::chrono::milliseconds>(compilation_time)
           .count());
-  ki.set_id(0);
   return ki;
 }
 
@@ -279,8 +278,6 @@ int main(int argc, char* argv[]) {
   }
 
   uint64_t id = 0;
-  for (int i = 0; i < kis.kernels_size(); ++i) {
-  }
 
   std::atomic_size_t tries{0};
   std::atomic_size_t successes{0};
