@@ -116,6 +116,13 @@ int main(int argc, char* argv[]) {
   std::vector<std::thread> workers;
   uint64_t total = FLAGS_number_options * FLAGS_number_inputs;
 
+  static auto write_proto = []() {
+    std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
+    if (not kis.SerializeToOstream(&output)) {
+      std::cout << "Serialization failed" << std::endl;
+    }
+  };
+
   tc::OptionsAndInputsGenerator gen{FLAGS_number_inputs, FLAGS_number_options};
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
@@ -168,19 +175,15 @@ int main(int argc, char* argv[]) {
                   options,
                   compilation_time);
               ++id;
+              if (successes.load() % 100 == 0) {
+                write_proto();
+              }
             } catch (...) {
               break;
             }
           }
         });
   }
-
-  static auto write_proto = []() {
-    std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
-    if (not kis.SerializeToOstream(&output)) {
-      std::cout << "Serialization failed" << std::endl;
-    }
-  };
 
   auto handler = [](int) {
     write_proto();
