@@ -1,7 +1,9 @@
 #include "tc/utils/common.h"
 
-#include <boost/functional/hash.hpp>
 #include <random>
+
+#include <boost/functional/hash.hpp>
+#include <gflags/gflags.h>
 
 #include "tc/version/version.h"
 
@@ -110,10 +112,22 @@ uint64_t OptionsGenerator::makeUnroll() const {
 GCInputsGenerator::GCInputsGenerator()
     : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
 
+namespace {
+DEFINE_int64(KHW_low, 1, "Kernel Height/Width lower bound");
+DEFINE_int64(KHW_high, 9, "Kernel Height/Width upper bound");
+DEFINE_int64(HW_low, 8, "Image Height/Width lower bound");
+DEFINE_int64(HW_high, 64, "Image Height/Width upper bound");
+DEFINE_int64(CF_low, 4, "");
+DEFINE_int64(CF_high, 32, "");
+} // namespace
+
 std::vector<tc::TensorInfo> GCInputsGenerator::operator()() const {
-  auto KHW = std::uniform_int_distribution<int64_t>{1, 9}(rng);
-  auto HW = std::uniform_int_distribution<int64_t>{9, 64}(rng);
-  auto CF = std::uniform_int_distribution<int64_t>{4, 32}(rng);
+  auto KHW = std::uniform_int_distribution<int64_t>{FLAGS_KHW_low,
+                                                    FLAGS_KHW_high}(rng);
+  auto HW =
+      std::uniform_int_distribution<int64_t>{FLAGS_HW_low, FLAGS_HW_high}(rng);
+  auto CF =
+      std::uniform_int_distribution<int64_t>{FLAGS_CF_low, FLAGS_CF_high}(rng);
 
   std::vector<int64_t> I_sizes{32, 32, CF, HW, HW};
   std::vector<int64_t> W1_sizes{32, CF, CF, KHW, KHW};
