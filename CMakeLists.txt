@@ -286,6 +286,8 @@ message(STATUS "CMAKE_INSTALL_PREFIX is ${CMAKE_INSTALL_PREFIX}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTC_DIR=\"\\\"${TC_DIR}\\\"\" ")
 
 include_directories(BEFORE ${PROJECT_SOURCE_DIR})
+
+add_subdirectory(third-party/pcg)
 add_subdirectory(tc)
 
 # At the moment pybind is only supported in CUDA mode and compilation fails
