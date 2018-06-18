@@ -119,6 +119,7 @@ add_library(
   SHARED
 
   ${TC_CUDA_CROSS_COMPILE_FILES}
+  cuda/cuda_compile.cc
 )
 # Unsets CUDA_HOME to compile without SDK
 set_target_properties(tc_core_cuda_no_sdk

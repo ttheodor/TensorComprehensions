@@ -69,4 +69,30 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
       new typename Backend::ExecutorType(
           inputsInfo, outputsInfo, halideComponents, compilationResult));
 }
+
+template <typename Backend>
+typename Backend::CompilationResultType compileToSource(
+    const std::string& tc,
+    const std::string& entryPoint,
+    const std::vector<const DLConstTensor*>& inputs,
+    /* TODO: in the future also pass outputs for stride and alignment info */
+    const typename Backend::MappingOptionsType& options) {
+  auto parsedTcs = detail::parse(tc);
+  auto tcDefinition = parsedTcs.at(entryPoint);
+
+  auto inputsInfo = makeTensorInfoVector(inputs);
+  auto outputsInfo = detail::inferOutputTensorInfo(tcDefinition, inputs);
+  auto halideComponents =
+      tc2halide::translate(isl::with_exceptions::globalIslCtx(), tcDefinition);
+  detail::checkInputsCompliant(halideComponents, inputs);
+
+  auto tcName = lang::Def(tcDefinition).name().name();
+  return Backend::compileWithTcMapper(
+      tcName,
+      halideComponents,
+      inputs,
+      /* TODO outputs, */
+      options);
+}
+
 } // namespace tc

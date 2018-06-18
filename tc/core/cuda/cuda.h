@@ -15,13 +15,13 @@
  */
 #pragma once
 
-#ifndef CUDA_HOME
-#error "CUDA_HOME must be defined"
-#endif // CUDA_HOME
+//#ifndef CUDA_HOME
+//#error "CUDA_HOME must be defined"
+//#endif // CUDA_HOME
 
-#ifndef CUB_HOME
-#error "CUB_HOME must be defined"
-#endif // CUB_HOME
+//#ifndef CUB_HOME
+//#error "CUB_HOME must be defined"
+//#endif // CUB_HOME
 
 #include <sstream>
 #include <stdexcept>
