@@ -915,9 +915,7 @@ std::tuple<std::string, tc::Grid, tc::Block> MappedScop::codegen(
     code << code::cuda::common;
     code << code::cuda::cubBlockReduce;
   }
-  code << "extern \"C\" {" << std::endl
-       << emitCudaKernel(specializedName, *mappedScopForCodegen) << "}"
-       << std::endl;
+  code << emitCudaKernel(specializedName, *mappedScopForCodegen) << std::endl;
 
   return std::make_tuple(
       code.str(),
