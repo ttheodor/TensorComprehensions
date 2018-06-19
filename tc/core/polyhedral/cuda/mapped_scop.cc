@@ -1023,7 +1023,7 @@ std::unique_ptr<MappedScop> MappedScop::makeWithOuterBlockInnerThreadStrategy(
   if (cudaOptions.proto().use_shared_memory()) {
     size_t sharedMemorySize = cudaOptions.proto().has_max_shared_memory()
         ? cudaOptions.proto().max_shared_memory()
-        : querySharedMemorySize();
+        : 49152;
     // If reductions found, their synchronization requires an opaque cache in
     // shared memory.  Subtract 4k from available shared memory for each
     // reduction found, this is hack based on each thread of max 1024 in the
