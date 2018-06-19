@@ -1,6 +1,7 @@
 #include "tc/aot/common.h"
 
 #include <random>
+#include <vector>
 
 #include <boost/functional/hash.hpp>
 #include <gflags/gflags.h>
@@ -34,7 +35,9 @@ tc::CudaMappingOptions OptionsGenerator::operator()() const {
                      .mapToBlocks(makeGrid())
                      .tileImperfectlyNested(makeBool())
                      .unroll(makeUnroll())
-                     .useSharedMemory(makeBool());
+                     .useSharedMemory(makeBool())
+                     .useReadOnlyCache(makeBool())
+                     .matchLibraryCalls(false);
   options.unrollCopyShared(
       options.proto().use_shared_memory() ? makeBool() : false);
 
