@@ -153,9 +153,12 @@ void emitArgs(stringstream& ss, const Scop& scop) {
 void emitKernelSignature(
     stringstream& ss,
     const std::string& specializedName,
-    const Scop& scop) {
+    const Scop& scop,
+    const Block& block) {
   TC_CHECK_NE(specializedName, "") << "name not provided";
-  ss << "__global__ void " << specializedName << "(";
+  ss << "__global__ __launch_bounds__("
+     << block.view[0] * block.view[1] * block.view[2] << ") void "
+     << specializedName << "(";
   emitArgs(ss, scop);
   ss << ") {" << endl;
 }
@@ -753,7 +756,7 @@ string emitCudaKernel(
   }
 
   stringstream ss;
-  emitKernelSignature(ss, specializedName, scop);
+  emitKernelSignature(ss, specializedName, scop, mscop.numThreads);
   emitThreadIdInit(ss, mscop);
   emitTensorViews(ss, scop.halide.outputs, paramValues);
   emitTensorViews(ss, scop.halide.inputs, paramValues);
