@@ -15,7 +15,10 @@ namespace tc {
 
 class OptionsGenerator {
  public:
-  OptionsGenerator(const std::vector<tc::TensorInfo>& ti);
+  OptionsGenerator(
+      const std::vector<tc::TensorInfo>& ti,
+      uint64_t numTileDims,
+      uint64_t numFixedTileDims);
 
   tc::CudaMappingOptions operator()() const;
 
@@ -30,6 +33,8 @@ class OptionsGenerator {
   uint64_t makeUnroll() const;
 
   uint64_t maxSize;
+  uint64_t numTileDims;
+  uint64_t numFixedTileDims;
   mutable pcg64 rng;
 };
 
@@ -45,6 +50,15 @@ class GCInputsGenerator {
 class WaveNetInputsGenerator {
  public:
   WaveNetInputsGenerator();
+  std::vector<tc::TensorInfo> operator()() const;
+
+ private:
+  mutable pcg64 rng;
+};
+
+class GroupNormalizationInputsGenerator {
+ public:
+  GroupNormalizationInputsGenerator();
   std::vector<tc::TensorInfo> operator()() const;
 
  private:
@@ -73,7 +87,11 @@ struct TensorInfoHash {
 template <typename InputsGenerator>
 class OptionsAndInputsGenerator {
  public:
-  OptionsAndInputsGenerator(uint64_t number_inputs, uint64_t number_options);
+  OptionsAndInputsGenerator(
+      uint64_t number_inputs,
+      uint64_t number_options,
+      uint64_t numTileDims,
+      uint64_t numFixedTileDims);
 
   std::pair<std::vector<tc::TensorInfo>, CudaMappingOptions> generate();
   void remove(
@@ -83,6 +101,9 @@ class OptionsAndInputsGenerator {
  private:
   uint64_t number_inputs;
   uint64_t number_options;
+
+  uint64_t numTileDims;
+  uint64_t numFixedTileDims;
   std::mutex mtx;
   std::unordered_map<
       std::vector<tc::TensorInfo>,
@@ -94,8 +115,13 @@ class OptionsAndInputsGenerator {
 template <typename InputsGenerator>
 OptionsAndInputsGenerator<InputsGenerator>::OptionsAndInputsGenerator(
     uint64_t number_inputs,
-    uint64_t number_options)
-    : number_inputs{number_inputs}, number_options{number_options} {
+    uint64_t number_options,
+    uint64_t numTileDims,
+    uint64_t numFixedTileDims)
+    : number_inputs{number_inputs},
+      number_options{number_options},
+      numTileDims{numTileDims},
+      numFixedTileDims{numFixedTileDims} {
   InputsGenerator ig;
   do {
     data[ig.operator()()];
@@ -109,7 +135,7 @@ OptionsAndInputsGenerator<InputsGenerator>::generate() {
   for (auto& [inputs, options] : data) {
     if (options.size() >= number_options)
       continue;
-    OptionsGenerator og{inputs};
+    OptionsGenerator og{inputs, numTileDims, numFixedTileDims};
 
     while (true) {
       auto opts = og();

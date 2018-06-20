@@ -20,9 +20,16 @@ uint64_t getMaxSize(const std::vector<tc::TensorInfo>& ti) {
 
 namespace tc {
 
-OptionsGenerator::OptionsGenerator(const std::vector<tc::TensorInfo>& ti)
+OptionsGenerator::OptionsGenerator(
+    const std::vector<tc::TensorInfo>& ti,
+    uint64_t numTileDims,
+    uint64_t numFixedTileDims)
     : maxSize{getMaxSize(ti)},
-      rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
+      numTileDims{numTileDims},
+      numFixedTileDims{numFixedTileDims},
+      rng{pcg_extras::seed_seq_from<std::random_device>{}} {
+  TC_CHECK_LE(numFixedTileDims, numTileDims);
+}
 
 tc::CudaMappingOptions OptionsGenerator::operator()() const {
   auto options = tc::CudaMappingOptions::makeNaiveMappingOptions()
@@ -57,10 +64,14 @@ tc::FusionStrategy OptionsGenerator::makeFusionStrategy() const {
 }
 
 std::vector<uint64_t> OptionsGenerator::makeTiles() const {
-  std::vector<uint64_t> sizes(3);
-  sizes[0] = 1;
-  sizes[1] = 1;
-  sizes[2] = std::uniform_int_distribution<uint64_t>{0, maxSize}(rng);
+  std::vector<uint64_t> sizes(numTileDims);
+  std::fill_n(sizes.begin(), numFixedTileDims, 1ul);
+  std::generate_n(
+      sizes.begin() + numFixedTileDims,
+      numTileDims - numFixedTileDims,
+      [this]() {
+        return std::uniform_int_distribution<uint64_t>{0, maxSize}(rng);
+      });
 
   return sizes;
 }
@@ -116,6 +127,9 @@ GCInputsGenerator::GCInputsGenerator()
     : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
 
 WaveNetInputsGenerator::WaveNetInputsGenerator()
+    : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
+
+GroupNormalizationInputsGenerator::GroupNormalizationInputsGenerator()
     : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
 
 namespace {
@@ -232,6 +246,52 @@ std::vector<tc::TensorInfo> WaveNetInputsGenerator::operator()() const {
           floatType, 32, SkipBias, tc::makeStridesFromSizes(SkipBias)},
       tc::TensorInfo{
           floatType, 32, Dilation, tc::makeStridesFromSizes(Dilation)}};
+}
+
+namespace {
+DEFINE_uint32(N_low, 1, "N (power of 2) batch size");
+DEFINE_uint32(N_high, 5, "N (power of 2) batch size");
+DEFINE_uint32(
+    C_low,
+    5,
+    "Number (power of 2) of channels (that will get divided into groups)");
+DEFINE_uint32(
+    C_high,
+    10,
+    "Number (power of 2) of channels (that will get divided into groups)");
+DEFINE_uint32(G_low, 0, "Number of groups (power of 2)");
+DEFINE_uint32(G_high, 5, "Number of groups (power of 2)");
+DEFINE_uint32(H_low, 16, "Height");
+DEFINE_uint32(H_high, 48, "Height");
+DEFINE_uint32(W_low, 16, "Width");
+DEFINE_uint32(W_high, 48, "Width");
+} // namespace
+
+std::vector<tc::TensorInfo> GroupNormalizationInputsGenerator::operator()()
+    const {
+  auto H =
+      std::uniform_int_distribution<int64_t>{FLAGS_H_low, FLAGS_H_high}(rng);
+  auto W =
+      std::uniform_int_distribution<int64_t>{FLAGS_W_low, FLAGS_W_high}(rng);
+  auto N = 1l << std::uniform_int_distribution<int64_t>{FLAGS_N_low,
+                                                        FLAGS_N_high}(rng);
+  auto C = 1l << std::uniform_int_distribution<int64_t>{FLAGS_C_low,
+                                                        FLAGS_C_high}(rng);
+  auto G = 1l << std::uniform_int_distribution<int64_t>{FLAGS_G_low,
+                                                        FLAGS_G_high}(rng);
+  auto D = C / G;
+
+  std::vector<int64_t> I_sizes{N, G, D, H, W};
+  std::vector<int64_t> gamma_sizes{G, D};
+  std::vector<int64_t> beta_sizes{G, D};
+  DLDataType floatType{DLDataTypeCode::kDLFloat, 32, 1};
+
+  return {
+      tc::TensorInfo{floatType, 32, I_sizes, tc::makeStridesFromSizes(I_sizes)},
+      tc::TensorInfo{
+          floatType, 32, gamma_sizes, tc::makeStridesFromSizes(gamma_sizes)},
+      tc::TensorInfo{
+          floatType, 32, beta_sizes, tc::makeStridesFromSizes(beta_sizes)}};
 }
 
 tc::KernelInfo makeKernelInfo(
