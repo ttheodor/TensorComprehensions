@@ -115,6 +115,9 @@ uint64_t OptionsGenerator::makeUnroll() const {
 GCInputsGenerator::GCInputsGenerator()
     : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
 
+WaveNetInputsGenerator::WaveNetInputsGenerator()
+    : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
+
 namespace {
 DEFINE_int64(KHW_low, 1, "Kernel Height/Width lower bound");
 DEFINE_int64(KHW_high, 9, "Kernel Height/Width upper bound");
@@ -143,6 +146,92 @@ std::vector<tc::TensorInfo> GCInputsGenerator::operator()() const {
           floatType, 32, W1_sizes, tc::makeStridesFromSizes(W1_sizes)},
       tc::TensorInfo{
           floatType, 32, B_sizes, tc::makeStridesFromSizes(B_sizes)}};
+}
+
+namespace {
+DEFINE_uint32(B_low, 1, "Batch size");
+DEFINE_uint32(B_high, 32, "Batch size");
+DEFINE_uint32(
+    RESIDUAL_C_low,
+    1,
+    "Residual channels (i.e. WaveNet block input channels)");
+DEFINE_uint32(
+    RESIDUAL_C_high,
+    64,
+    "Residual channels (i.e. WaveNet block input channels)");
+DEFINE_uint32(
+    DILATION_C_low,
+    1,
+    "Dilation channels (i.e. WaveNet block channels after dilated convolution)");
+DEFINE_uint32(
+    DILATION_C_high,
+    64,
+    "Dilation channels (i.e. WaveNet block channels after dilated convolution)");
+DEFINE_uint32(
+    SKIP_C_low,
+    1,
+    "Skip channels (i.e. WaveNet block channels in the skip tensor)");
+DEFINE_uint32(
+    SKIP_C_high,
+    64,
+    "Skip channels (i.e. WaveNet block channels in the skip tensor)");
+DEFINE_uint32(
+    RECEPTIVE_FIELD,
+    4000,
+    "https://arxiv.org/pdf/1609.03499.pdf paper mentions 16K samples per second"
+    "and a receptive field of 240ms so we approx. set the default to 4000)");
+DEFINE_uint32(DILATION_FACTOR_low, 0, "Powers of 2 from 1 to 512 in the paper");
+DEFINE_uint32(
+    DILATION_FACTOR_high,
+    9,
+    "Powers of 2 from 1 to 512 in the paper");
+} // namespace
+
+std::vector<tc::TensorInfo> WaveNetInputsGenerator::operator()() const {
+  auto B =
+      std::uniform_int_distribution<int64_t>{FLAGS_B_low, FLAGS_B_high}(rng);
+  auto RESIDUAL_C = std::uniform_int_distribution<int64_t>{
+      FLAGS_RESIDUAL_C_low, FLAGS_RESIDUAL_C_high}(rng);
+  auto DILATION_C = std::uniform_int_distribution<int64_t>{
+      FLAGS_DILATION_C_low, FLAGS_RESIDUAL_C_high}(rng);
+  auto SKIP_C = std::uniform_int_distribution<int64_t>{FLAGS_SKIP_C_low,
+                                                       FLAGS_SKIP_C_high}(rng);
+  auto DILATION_FACTOR = 1l
+      << std::uniform_int_distribution<int64_t>{FLAGS_DILATION_FACTOR_low,
+                                                FLAGS_DILATION_FACTOR_low}(rng);
+
+  std::vector<int64_t> Data{B, RESIDUAL_C, FLAGS_RECEPTIVE_FIELD};
+  std::vector<int64_t> FilterWeight{DILATION_C, RESIDUAL_C, 2};
+  std::vector<int64_t> FilterBias{DILATION_C};
+  std::vector<int64_t> GateWeight{DILATION_C, RESIDUAL_C, 2};
+  std::vector<int64_t> GateBias{DILATION_C};
+  std::vector<int64_t> ResWeight{RESIDUAL_C, DILATION_C};
+  std::vector<int64_t> ResBias{RESIDUAL_C};
+  std::vector<int64_t> SkipWeight{SKIP_C, DILATION_C};
+  std::vector<int64_t> SkipBias{SKIP_C};
+  std::vector<int64_t> Dilation{DILATION_FACTOR};
+
+  DLDataType floatType{DLDataTypeCode::kDLFloat, 32, 1};
+
+  return {
+      tc::TensorInfo{floatType, 32, Data, tc::makeStridesFromSizes(Data)},
+      tc::TensorInfo{
+          floatType, 32, FilterWeight, tc::makeStridesFromSizes(FilterWeight)},
+      tc::TensorInfo{
+          floatType, 32, FilterBias, tc::makeStridesFromSizes(FilterBias)},
+      tc::TensorInfo{
+          floatType, 32, GateWeight, tc::makeStridesFromSizes(GateWeight)},
+      tc::TensorInfo{
+          floatType, 32, GateBias, tc::makeStridesFromSizes(GateBias)},
+      tc::TensorInfo{
+          floatType, 32, ResWeight, tc::makeStridesFromSizes(ResWeight)},
+      tc::TensorInfo{floatType, 32, ResBias, tc::makeStridesFromSizes(ResBias)},
+      tc::TensorInfo{
+          floatType, 32, SkipWeight, tc::makeStridesFromSizes(SkipWeight)},
+      tc::TensorInfo{
+          floatType, 32, SkipBias, tc::makeStridesFromSizes(SkipBias)},
+      tc::TensorInfo{
+          floatType, 32, Dilation, tc::makeStridesFromSizes(Dilation)}};
 }
 
 tc::KernelInfo makeKernelInfo(
@@ -174,42 +263,6 @@ tc::KernelInfo makeKernelInfo(
       std::chrono::duration_cast<std::chrono::milliseconds>(compilation_time)
           .count());
   return ki;
-}
-
-OptionsAndInputsGenerator::OptionsAndInputsGenerator(
-    uint64_t number_inputs,
-    uint64_t number_options)
-    : number_inputs{number_inputs}, number_options{number_options} {
-  GCInputsGenerator ig;
-  do {
-    data[ig.operator()()];
-  } while (data.size() < number_inputs);
-}
-
-std::pair<std::vector<tc::TensorInfo>, CudaMappingOptions>
-OptionsAndInputsGenerator::generate() {
-  std::lock_guard<std::mutex> lock{mtx};
-  for (auto& [inputs, options] : data) {
-    if (options.size() >= number_options)
-      continue;
-    OptionsGenerator og{inputs};
-
-    while (true) {
-      auto opts = og();
-      if (options.count(opts) > 0)
-        continue;
-      options.insert(opts);
-      return std::make_pair(inputs, opts);
-    }
-  }
-
-  throw std::runtime_error{"Enough requested pairs have been generated."};
-}
-
-void OptionsAndInputsGenerator::remove(
-    const std::vector<tc::TensorInfo>& inputs,
-    const CudaMappingOptions& options) {
-  data[inputs].erase(options);
 }
 
 std::size_t hash_value(const tc::TensorInfo& ti) {

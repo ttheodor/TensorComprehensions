@@ -8,3 +8,8 @@ add_executable(gc_generator group_convolution_generator.cc)
 target_link_libraries(gc_generator PUBLIC generator_common pcg stdc++fs)
 set_property(TARGET gc_generator PROPERTY CXX_STANDARD 17)
 set_property(TARGET gc_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(wavenet_generator wavenet_generator.cc)
+target_link_libraries(wavenet_generator PUBLIC generator_common pcg stdc++fs)
+set_property(TARGET wavenet_generator PROPERTY CXX_STANDARD 17)
+set_property(TARGET wavenet_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
