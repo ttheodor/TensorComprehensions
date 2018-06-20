@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
   };
 
   tc::OptionsAndInputsGenerator<tc::GCInputsGenerator> gen{
-      FLAGS_number_inputs, FLAGS_number_options};
+      FLAGS_number_inputs, FLAGS_number_options, 3, 2};
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
         [&gen, &gc_tc, &tries, &successes, total, &id, &used_ids, &mtx]() {

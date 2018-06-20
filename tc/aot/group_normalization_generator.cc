@@ -70,58 +70,45 @@ auto loadProto(const std::string& filename) {
   return kis;
 }
 
-constexpr static auto TC_WAVENET1_NAME = "wavenet1";
-constexpr static auto TC_WAVENET = R"TC(
-# Original data is float(B, C, RECEPTIVE_FIELD) and undergoes a \
-# Conv1d to become float(B, RESIDUAL_C, RECEPTIVE_FIELD)
-
-def wavenet1(
-    float(B, RESIDUAL_C, RECEPTIVE_FIELD) Data,
-    float(DILATION_C, RESIDUAL_C, 2) FilterWeight,
-    float(DILATION_C) FilterBias,
-    float(DILATION_C, RESIDUAL_C, 2) GateWeight,
-    float(DILATION_C) GateBias,
-    float(RESIDUAL_C, DILATION_C) ResWeight,
-    float(RESIDUAL_C) ResBias,
-    float(SKIP_C, DILATION_C) SkipWeight,
-    float(SKIP_C) SkipBias,
-    float(DILATION_FACTOR) Dilation)
-    -> (FilterOut, GateOut, NonLin, Res, Skip)
+constexpr static auto TC_GroupNormalizationSingleKernel_NAME =
+    "group_normalization_single_kernel";
+constexpr static auto TC_GroupNormalization = R"TC(
+def moments2_2D_1D(float(N, K) I) -> (mean, var)
 {
-    FilterOut(b, dilation_c, rf)   = FilterBias(dilation_c)
-        where b in 0:B, dilation_c in 0:DILATION_C, rf in 0:RECEPTIVE_FIELD
-    FilterOut(b, dilation_c, rf)  += Data(b, r_residual_c, rf) * FilterWeight(dilation_c, r_residual_c, 1) +
-        (
-          (rf - DILATION_FACTOR >= 0) ?
-            Data(b, r_residual_c, rf - DILATION_FACTOR) * FilterWeight(dilation_c, r_residual_c, 0) :
-            float(0)
-        )
-        where rf in 0:RECEPTIVE_FIELD
-
-    GateOut(b, dilation_c, rf)   = GateBias(dilation_c)
-        where b in 0:B, dilation_c in 0:DILATION_C, rf in 0:RECEPTIVE_FIELD
-    GateOut(b, dilation_c, rf)  += Data(b, r_residual_c, rf) * GateWeight(dilation_c, r_residual_c, 1) +
-        (
-          (rf - DILATION_FACTOR >= 0) ?
-            Data(b, r_residual_c, rf - DILATION_FACTOR) * GateWeight(dilation_c, r_residual_c, 0) :
-            float(0)
-        )
-        where rf in 0:RECEPTIVE_FIELD
-
-    NonLin(b, dilation_c, rf)   =         tanh(FilterOut(b, dilation_c, rf))
-        where rf in 0:RECEPTIVE_FIELD
-    NonLin(b, dilation_c, rf)  *= 1 / (1 + exp( -GateOut(b, dilation_c, rf)))
-        where rf in 0:RECEPTIVE_FIELD
-
-       Res(b, residual_c, rf)   =   Data(b,  residual_c, rf) + ResBias(residual_c)
-       Res(b, residual_c, rf)  += NonLin(b, r_dilation_c, rf) * ResWeight(residual_c, r_dilation_c)
-
-      Skip(b, skip, rf) +=! NonLin(b, r_dilation_c, rf) * SkipWeight(skip, r_dilation_c)
-        where rf in 0:RECEPTIVE_FIELD
-      Skip(b, skip, rf)  = Skip(b, skip, rf) + SkipBias(skip)
-        where rf in 0:RECEPTIVE_FIELD
+# var = E(x^2) - mean^2.
+    mean(n) +=! I(n, r_k)
+     var(n) +=! I(n, r_k) * I(n, r_k)
+    mean(n)  = mean(n) / (K)
+     var(n)  =  var(n) / (K) - mean(n) * mean(n)
 }
-  )TC";
+
+def group_normalization(
+    float(N, G, D, H, W) I, float(G, D) gamma, float(G, D) beta,
+    float(N, G) mean, float(N, G) var)
+    -> (O)
+{
+    O(n, g, d, h, w) = gamma(g, d)
+      * ( I(n, g, d, h, w) - mean(n, g) )
+      * rsqrt( var(n, g) + 1e-5 )
+      + beta(g, d)
+}
+
+def group_normalization_single_kernel(
+    float(N, G, D, H, W) I, float(G, D) gamma, float(G, D) beta)
+    -> (O, sum, sumSquares)
+{
+# This implementation uses the formula var = E(x^2) - mean^2 and
+# inlining. This gets another 20% on V100.
+            sum(n, g) +=! I(n, g, r_d, r_h, r_w)
+     sumSquares(n, g) +=! I(n, g, r_d, r_h, r_w) * I(n, g, r_d, r_h, r_w)
+    O(n, g, d, h, w) = gamma(g, d)
+      * ( I(n, g, d, h, w) - sum(n, g) / (D * H * W))
+      * rsqrt( sumSquares(n, g) / (D * H * W)
+            - sum(n, g) * sum(n, g)  / (D * H * W)  / (D * H * W)
+            + 1e-5 )
+      + beta(g, d)
+}
+)TC";
 
 int main(int argc, char* argv[]) {
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -157,8 +144,8 @@ int main(int argc, char* argv[]) {
     }
   };
 
-  tc::OptionsAndInputsGenerator<tc::WaveNetInputsGenerator> gen{
-      FLAGS_number_inputs, FLAGS_number_options, 3, 0};
+  tc::OptionsAndInputsGenerator<tc::GroupNormalizationInputsGenerator> gen{
+      FLAGS_number_inputs, FLAGS_number_options, 1, 1};
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
         [&gen, &tries, &successes, total, &id, &used_ids, &mtx]() {
@@ -169,29 +156,33 @@ int main(int argc, char* argv[]) {
               auto [inputs, options] = gen.generate();
               auto DLU = tc::makeDLConstTensorVector(inputs);
               auto DL = tc::extractRawPtrs(DLU);
-              auto outputsInfo =
-                  tc::inferOutputTensorInfo(TC_WAVENET, TC_WAVENET1_NAME, DL);
+              auto outputsInfo = tc::inferOutputTensorInfo(
+                  TC_GroupNormalization,
+                  TC_GroupNormalizationSingleKernel_NAME,
+                  DL);
 
               auto t0 = high_resolution_clock::now();
               auto res = tc::compileToSource<tc::CudaBackend>(
-                  TC_WAVENET, TC_WAVENET1_NAME, DL, options);
+                  TC_GroupNormalization,
+                  TC_GroupNormalizationSingleKernel_NAME,
+                  DL,
+                  options);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "
                         << duration_cast<milliseconds>(compilation_time).count()
                         << "ms" << std::endl;
               if (not stillGoodAfterTighening(res)) {
-                // std::cout << "Not enough threads and/or blocks. Discarding...
-                // "
-                //<< std::endl;
-                // std::cout << tc::CudaMappingOptionsAsCpp(opts) << std::endl;
-                // std::cout << res.grid.view.proto.x() << ' '
-                //<< res.grid.view.proto.y() << ' '
-                //<< res.grid.view.proto.z() << std::endl;
-                // std::cout << res.block.view.proto.x() << ' '
-                //<< res.block.view.proto.y() << ' '
-                //<< res.block.view.proto.z() << std::endl;
-                // std::cout << res.source << std::endl;
+                std::cout << "Not enough threads and/or blocks. Discarding...  "
+                          << std::endl;
+                std::cout << tc::CudaMappingOptionsAsCpp(options) << std::endl;
+                std::cout << res.grid.view.proto.x() << ' '
+                          << res.grid.view.proto.y() << ' '
+                          << res.grid.view.proto.z() << std::endl;
+                std::cout << res.block.view.proto.x() << ' '
+                          << res.block.view.proto.y() << ' '
+                          << res.block.view.proto.z() << std::endl;
+                std::cout << res.source << std::endl;
                 gen.remove(inputs, options);
                 continue;
               }
@@ -204,7 +195,7 @@ int main(int argc, char* argv[]) {
               *kis.add_kernels() = makeKernelInfo(
                   res,
                   id,
-                  TC_WAVENET,
+                  TC_GroupNormalization,
                   inputs,
                   outputsInfo,
                   options,

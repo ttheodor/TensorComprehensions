@@ -13,3 +13,8 @@ add_executable(wavenet_generator wavenet_generator.cc)
 target_link_libraries(wavenet_generator PUBLIC generator_common pcg stdc++fs)
 set_property(TARGET wavenet_generator PROPERTY CXX_STANDARD 17)
 set_property(TARGET wavenet_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(group_normalization_generator group_normalization_generator.cc)
+target_link_libraries(group_normalization_generator PUBLIC generator_common pcg stdc++fs)
+set_property(TARGET group_normalization_generator PROPERTY CXX_STANDARD 17)
+set_property(TARGET group_normalization_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
