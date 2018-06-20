@@ -23,20 +23,10 @@ namespace fs = std::experimental::filesystem;
 #include "tc/core/compiler.h"
 #include "tc/core/cuda/cuda_backend.h"
 #include "tc/core/tensor.h"
-#include "tc/library/group_convolution.h"
 #include "tc/proto/aot.pb.h"
 #include "tc/version/version.h"
 
 namespace {
-DEFINE_uint32(N, 32, "Batch size (NCHW notation)");
-DEFINE_uint32(G, 32, "Number of groups (NCHW notation)");
-DEFINE_uint32(C, 4, "Input channels (NCHW notation)");
-DEFINE_uint32(F, 4, "Output filters (NCHW notation)");
-DEFINE_uint32(H, 56, "Image width (NCHW notation)");
-DEFINE_uint32(W, 56, "Image height (NCHW notation)");
-DEFINE_uint32(KH, 3, "Kernel width (NCHW notation)");
-DEFINE_uint32(KW, 3, "Kernel height (NCHW notation)");
-
 DEFINE_uint32(
     number_options,
     10,
@@ -49,20 +39,6 @@ DEFINE_string(
     output,
     "kernels.proto",
     "Output filename (default: kernels.proto");
-
-DEFINE_uint32(B0, 1, "B0");
-DEFINE_uint32(B1, 1, "B1");
-DEFINE_uint32(B2, 1, "B2");
-DEFINE_uint32(G0, 1, "G0");
-DEFINE_uint32(G1, 1, "G1");
-DEFINE_uint32(G2, 1, "G2");
-DEFINE_uint32(T0, 1, "T0");
-DEFINE_uint32(T1, 1, "T1");
-DEFINE_uint32(T2, 1, "T2");
-DEFINE_uint32(T3, 1, "T5");
-DEFINE_uint32(T4, 1, "T4");
-DEFINE_uint32(T5, 1, "T5");
-
 DEFINE_uint32(threads, 1, "Number of threads.");
 
 } // namespace
@@ -94,6 +70,59 @@ auto loadProto(const std::string& filename) {
   return kis;
 }
 
+constexpr static auto TC_WAVENET1_NAME = "wavenet1";
+constexpr static auto TC_WAVENET = R"TC(
+# Original data is float(B, C, RECEPTIVE_FIELD) and undergoes a \
+# Conv1d to become float(B, RESIDUAL_C, RECEPTIVE_FIELD)
+
+def wavenet1(
+    float(B, RESIDUAL_C, RECEPTIVE_FIELD) Data,
+    float(DILATION_C, RESIDUAL_C, 2) FilterWeight,
+    float(DILATION_C) FilterBias,
+    float(DILATION_C, RESIDUAL_C, 2) GateWeight,
+    float(DILATION_C) GateBias,
+    float(RESIDUAL_C, DILATION_C) ResWeight,
+    float(RESIDUAL_C) ResBias,
+    float(SKIP_C, DILATION_C) SkipWeight,
+    float(SKIP_C) SkipBias,
+    float(DILATION_FACTOR) Dilation)
+    -> (FilterOut, GateOut, NonLin, Res, Skip)
+{
+    FilterOut(b, dilation_c, rf)   = FilterBias(dilation_c)
+        where b in 0:B, dilation_c in 0:DILATION_C, rf in 0:RECEPTIVE_FIELD
+    FilterOut(b, dilation_c, rf)  += Data(b, r_residual_c, rf) * FilterWeight(dilation_c, r_residual_c, 1) +
+        (
+          (rf - DILATION_FACTOR >= 0) ?
+            Data(b, r_residual_c, rf - DILATION_FACTOR) * FilterWeight(dilation_c, r_residual_c, 0) :
+            float(0)
+        )
+        where rf in 0:RECEPTIVE_FIELD
+
+    GateOut(b, dilation_c, rf)   = GateBias(dilation_c)
+        where b in 0:B, dilation_c in 0:DILATION_C, rf in 0:RECEPTIVE_FIELD
+    GateOut(b, dilation_c, rf)  += Data(b, r_residual_c, rf) * GateWeight(dilation_c, r_residual_c, 1) +
+        (
+          (rf - DILATION_FACTOR >= 0) ?
+            Data(b, r_residual_c, rf - DILATION_FACTOR) * GateWeight(dilation_c, r_residual_c, 0) :
+            float(0)
+        )
+        where rf in 0:RECEPTIVE_FIELD
+
+    NonLin(b, dilation_c, rf)   =         tanh(FilterOut(b, dilation_c, rf))
+        where rf in 0:RECEPTIVE_FIELD
+    NonLin(b, dilation_c, rf)  *= 1 / (1 + exp( -GateOut(b, dilation_c, rf)))
+        where rf in 0:RECEPTIVE_FIELD
+
+       Res(b, residual_c, rf)   =   Data(b,  residual_c, rf) + ResBias(residual_c)
+       Res(b, residual_c, rf)  += NonLin(b, r_dilation_c, rf) * ResWeight(residual_c, r_dilation_c)
+
+      Skip(b, skip, rf) +=! NonLin(b, r_dilation_c, rf) * SkipWeight(skip, r_dilation_c)
+        where rf in 0:RECEPTIVE_FIELD
+      Skip(b, skip, rf)  = Skip(b, skip, rf) + SkipBias(skip)
+        where rf in 0:RECEPTIVE_FIELD
+}
+  )TC";
+
 int main(int argc, char* argv[]) {
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
@@ -103,8 +132,6 @@ int main(int argc, char* argv[]) {
               << std::endl;
     kis = loadProto(FLAGS_output);
   }
-
-  auto gc_tc = tc::makeGroupConvolution2DTc(1, 1);
 
   std::unordered_set<uint64_t> used_ids;
   for (const auto& ki : kis.kernels()) {
@@ -130,11 +157,11 @@ int main(int argc, char* argv[]) {
     }
   };
 
-  tc::OptionsAndInputsGenerator<tc::GCInputsGenerator> gen{
+  tc::OptionsAndInputsGenerator<tc::WaveNetInputsGenerator> gen{
       FLAGS_number_inputs, FLAGS_number_options};
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
-        [&gen, &gc_tc, &tries, &successes, total, &id, &used_ids, &mtx]() {
+        [&gen, &tries, &successes, total, &id, &used_ids, &mtx]() {
           while (successes.load() < total) {
             std::cout << "Compilation attempts: " << tries.fetch_add(1)
                       << " Successes: " << successes.load() << std::endl;
@@ -143,11 +170,11 @@ int main(int argc, char* argv[]) {
               auto DLU = tc::makeDLConstTensorVector(inputs);
               auto DL = tc::extractRawPtrs(DLU);
               auto outputsInfo =
-                  tc::inferOutputTensorInfo(gc_tc, "group_convolution", DL);
+                  tc::inferOutputTensorInfo(TC_WAVENET, TC_WAVENET1_NAME, DL);
 
               auto t0 = high_resolution_clock::now();
               auto res = tc::compileToSource<tc::CudaBackend>(
-                  gc_tc, "group_convolution", DL, options);
+                  TC_WAVENET, TC_WAVENET1_NAME, DL, options);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "
@@ -177,7 +204,7 @@ int main(int argc, char* argv[]) {
               *kis.add_kernels() = makeKernelInfo(
                   res,
                   id,
-                  gc_tc,
+                  TC_WAVENET,
                   inputs,
                   outputsInfo,
                   options,

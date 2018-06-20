@@ -42,6 +42,15 @@ class GCInputsGenerator {
   mutable pcg64 rng;
 };
 
+class WaveNetInputsGenerator {
+ public:
+  WaveNetInputsGenerator();
+  std::vector<tc::TensorInfo> operator()() const;
+
+ private:
+  mutable pcg64 rng;
+};
+
 tc::KernelInfo makeKernelInfo(
     const tc::CudaCompilationResult& res,
     uint64_t id,
@@ -61,6 +70,7 @@ struct TensorInfoHash {
   size_t operator()(const std::vector<tc::TensorInfo>& tis) const;
 };
 
+template <typename InputsGenerator>
 class OptionsAndInputsGenerator {
  public:
   OptionsAndInputsGenerator(uint64_t number_inputs, uint64_t number_options);
@@ -80,5 +90,44 @@ class OptionsAndInputsGenerator {
       TensorInfoHash>
       data;
 };
+
+template <typename InputsGenerator>
+OptionsAndInputsGenerator<InputsGenerator>::OptionsAndInputsGenerator(
+    uint64_t number_inputs,
+    uint64_t number_options)
+    : number_inputs{number_inputs}, number_options{number_options} {
+  InputsGenerator ig;
+  do {
+    data[ig.operator()()];
+  } while (data.size() < number_inputs);
+}
+
+template <typename InputsGenerator>
+std::pair<std::vector<tc::TensorInfo>, CudaMappingOptions>
+OptionsAndInputsGenerator<InputsGenerator>::generate() {
+  std::lock_guard<std::mutex> lock{mtx};
+  for (auto& [inputs, options] : data) {
+    if (options.size() >= number_options)
+      continue;
+    OptionsGenerator og{inputs};
+
+    while (true) {
+      auto opts = og();
+      if (options.count(opts) > 0)
+        continue;
+      options.insert(opts);
+      return std::make_pair(inputs, opts);
+    }
+  }
+
+  throw std::runtime_error{"Enough requested pairs have been generated."};
+}
+
+template <typename InputsGenerator>
+void OptionsAndInputsGenerator<InputsGenerator>::remove(
+    const std::vector<tc::TensorInfo>& inputs,
+    const CudaMappingOptions& options) {
+  data[inputs].erase(options);
+}
 
 } // namespace tc
