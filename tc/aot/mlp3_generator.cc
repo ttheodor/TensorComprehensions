@@ -56,7 +56,7 @@ bool stillGoodAfterTighening(const tc::CudaCompilationResult& res) {
     return false;
   auto b = blocksPerGrid(res.grid);
 
-  if (b < 8)
+  if (b < 56)
     return false;
   return true;
 }
@@ -70,43 +70,19 @@ auto loadProto(const std::string& filename) {
   return kis;
 }
 
-constexpr static auto TC_GroupNormalizationSingleKernel_NAME =
-    "group_normalization_single_kernel";
-constexpr static auto TC_GroupNormalization = R"TC(
-def moments2_2D_1D(float(N, K) I) -> (mean, var)
-{
-# var = E(x^2) - mean^2.
-    mean(n) +=! I(n, r_k)
-     var(n) +=! I(n, r_k) * I(n, r_k)
-    mean(n)  = mean(n) / (K)
-     var(n)  =  var(n) / (K) - mean(n) * mean(n)
-}
-
-def group_normalization(
-    float(N, G, D, H, W) I, float(G, D) gamma, float(G, D) beta,
-    float(N, G) mean, float(N, G) var)
-    -> (O)
-{
-    O(n, g, d, h, w) = gamma(g, d)
-      * ( I(n, g, d, h, w) - mean(n, g) )
-      * rsqrt( var(n, g) + 1e-5 )
-      + beta(g, d)
-}
-
-def group_normalization_single_kernel(
-    float(N, G, D, H, W) I, float(G, D) gamma, float(G, D) beta)
-    -> (O, sum, sumSquares)
-{
-# This implementation uses the formula var = E(x^2) - mean^2 and
-# inlining. This gets another 20% on V100.
-            sum(n, g) +=! I(n, g, r_d, r_h, r_w)
-     sumSquares(n, g) +=! I(n, g, r_d, r_h, r_w) * I(n, g, r_d, r_h, r_w)
-    O(n, g, d, h, w) = gamma(g, d)
-      * ( I(n, g, d, h, w) - sum(n, g) / (D * H * W))
-      * rsqrt( sumSquares(n, g) / (D * H * W)
-            - sum(n, g) * sum(n, g)  / (D * H * W)  / (D * H * W)
-            + 1e-5 )
-      + beta(g, d)
+constexpr static auto TC_MLP3_NAME = "mlp3";
+constexpr static auto TC_MLP3 = R"TC(
+def mlp3(float(B,N) I, float(O,N) W2, float(O) B2, float(P,O) W3, float(P) B3,
+         float(Q,P) W4, float(Q) B4) -> (O2, O3, O4) {
+    O2(b, o) +=!  I(b, n) * W2(o, n)
+    O2(b, o)  =  O2(b, o) + B2(o)
+    O2(b, o)  = fmax(O2(b, o), 0)
+    O3(b, p) +=! O2(b, o) * W3(p, o)
+    O3(b, p)  =  O3(b, p) + B3(p)
+    O3(b, p)  = fmax(O3(b, p), 0)
+    O4(b, q) +=! O3(b, p) * W4(q, p)
+    O4(b, q)  =  O4(b, q) + B4(q)
+    O4(b, q)  = fmax(O4(b, q), 0)
 }
 )TC";
 
@@ -144,8 +120,8 @@ int main(int argc, char* argv[]) {
     }
   };
 
-  tc::OptionsAndInputsGenerator<tc::GroupNormalizationInputsGenerator> gen{
-      FLAGS_number_inputs, FLAGS_number_options, 5, 0};
+  tc::OptionsAndInputsGenerator<tc::MLP3InputsGenerator> gen{
+      FLAGS_number_inputs, FLAGS_number_options, 3, 1};
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
         [&gen, &tries, &successes, total, &id, &used_ids, &mtx]() {
@@ -156,24 +132,19 @@ int main(int argc, char* argv[]) {
               auto [inputs, options] = gen.generate();
               auto DLU = tc::makeDLConstTensorVector(inputs);
               auto DL = tc::extractRawPtrs(DLU);
-              auto outputsInfo = tc::inferOutputTensorInfo(
-                  TC_GroupNormalization,
-                  TC_GroupNormalizationSingleKernel_NAME,
-                  DL);
+              auto outputsInfo =
+                  tc::inferOutputTensorInfo(TC_MLP3, TC_MLP3_NAME, DL);
 
               auto t0 = high_resolution_clock::now();
               auto res = tc::compileToSource<tc::CudaBackend>(
-                  TC_GroupNormalization,
-                  TC_GroupNormalizationSingleKernel_NAME,
-                  DL,
-                  options);
+                  TC_MLP3, TC_MLP3_NAME, DL, options);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "
                         << duration_cast<milliseconds>(compilation_time).count()
                         << "ms" << std::endl;
               if (not stillGoodAfterTighening(res)) {
-                std::cout << "Not enough threads and/or blocks. Discarding...  "
+                std::cout << "Not enough threads and/or blocks. Discarding..."
                           << std::endl;
                 std::cout << tc::CudaMappingOptionsAsCpp(options) << std::endl;
                 std::cout << res.grid.view.proto.x() << ' '
@@ -195,7 +166,7 @@ int main(int argc, char* argv[]) {
               *kis.add_kernels() = makeKernelInfo(
                   res,
                   id,
-                  TC_GroupNormalization,
+                  TC_MLP3,
                   inputs,
                   outputsInfo,
                   options,

@@ -23,6 +23,7 @@ namespace fs = std::experimental::filesystem;
 #include "tc/core/compiler.h"
 #include "tc/core/cuda/cuda_backend.h"
 #include "tc/core/tensor.h"
+#include "tc/library/batchnorm.h"
 #include "tc/proto/aot.pb.h"
 #include "tc/version/version.h"
 
@@ -144,8 +145,8 @@ int main(int argc, char* argv[]) {
     }
   };
 
-  tc::OptionsAndInputsGenerator<tc::GroupNormalizationInputsGenerator> gen{
-      FLAGS_number_inputs, FLAGS_number_options, 5, 0};
+  tc::OptionsAndInputsGenerator<tc::BatchNormalizationInputsGenerator> gen{
+      FLAGS_number_inputs, FLAGS_number_options, 3, 1};
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
         [&gen, &tries, &successes, total, &id, &used_ids, &mtx]() {
@@ -157,16 +158,11 @@ int main(int argc, char* argv[]) {
               auto DLU = tc::makeDLConstTensorVector(inputs);
               auto DL = tc::extractRawPtrs(DLU);
               auto outputsInfo = tc::inferOutputTensorInfo(
-                  TC_GroupNormalization,
-                  TC_GroupNormalizationSingleKernel_NAME,
-                  DL);
+                  tc::TC_BATCHNORM, tc::TC_BATCHNORM_NAME, DL);
 
               auto t0 = high_resolution_clock::now();
               auto res = tc::compileToSource<tc::CudaBackend>(
-                  TC_GroupNormalization,
-                  TC_GroupNormalizationSingleKernel_NAME,
-                  DL,
-                  options);
+                  tc::TC_BATCHNORM, tc::TC_BATCHNORM_NAME, DL, options);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "
@@ -195,7 +191,7 @@ int main(int argc, char* argv[]) {
               *kis.add_kernels() = makeKernelInfo(
                   res,
                   id,
-                  TC_GroupNormalization,
+                  tc::TC_BATCHNORM,
                   inputs,
                   outputsInfo,
                   options,
@@ -204,7 +200,8 @@ int main(int argc, char* argv[]) {
               if (successes.load() % 100 == 0) {
                 write_proto();
               }
-            } catch (...) {
+            } catch (const std::exception& e) {
+              std::cout << e.what() << std::endl;
               break;
             }
           }

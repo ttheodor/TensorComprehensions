@@ -13,3 +13,23 @@ add_executable(gc_generator_json group_convolution_generator_from_json.cc)
 target_link_libraries(gc_generator_json PUBLIC generator_common pcg stdc++fs json)
 set_property(TARGET gc_generator_json PROPERTY CXX_STANDARD 17)
 set_property(TARGET gc_generator_json PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(wavenet_generator wavenet_generator.cc)
+target_link_libraries(wavenet_generator PUBLIC generator_common pcg stdc++fs)
+set_property(TARGET wavenet_generator PROPERTY CXX_STANDARD 17)
+set_property(TARGET wavenet_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(group_normalization_generator group_normalization_generator.cc)
+target_link_libraries(group_normalization_generator PUBLIC generator_common pcg stdc++fs)
+set_property(TARGET group_normalization_generator PROPERTY CXX_STANDARD 17)
+set_property(TARGET group_normalization_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(batch_normalization_generator batch_normalization_generator.cc)
+target_link_libraries(batch_normalization_generator PUBLIC generator_common pcg stdc++fs)
+set_property(TARGET batch_normalization_generator PROPERTY CXX_STANDARD 17)
+set_property(TARGET batch_normalization_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(mlp3_generator mlp3_generator.cc)
+target_link_libraries(mlp3_generator PUBLIC generator_common pcg stdc++fs)
+set_property(TARGET mlp3_generator PROPERTY CXX_STANDARD 17)
+set_property(TARGET mlp3_generator PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
