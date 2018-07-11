@@ -129,7 +129,13 @@ GCInputsGenerator::GCInputsGenerator()
 WaveNetInputsGenerator::WaveNetInputsGenerator()
     : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
 
+MLP3InputsGenerator::MLP3InputsGenerator()
+    : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
+
 GroupNormalizationInputsGenerator::GroupNormalizationInputsGenerator()
+    : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
+
+BatchNormalizationInputsGenerator::BatchNormalizationInputsGenerator()
     : rng{pcg_extras::seed_seq_from<std::random_device>{}} {}
 
 namespace {
@@ -163,8 +169,8 @@ std::vector<tc::TensorInfo> GCInputsGenerator::operator()() const {
 }
 
 namespace {
-DEFINE_uint32(B_low, 1, "Batch size");
-DEFINE_uint32(B_high, 32, "Batch size");
+DEFINE_uint32(WNB_low, 1, "Batch size");
+DEFINE_uint32(WNB_high, 32, "Batch size");
 DEFINE_uint32(
     RESIDUAL_C_low,
     1,
@@ -202,8 +208,8 @@ DEFINE_uint32(
 } // namespace
 
 std::vector<tc::TensorInfo> WaveNetInputsGenerator::operator()() const {
-  auto B =
-      std::uniform_int_distribution<int64_t>{FLAGS_B_low, FLAGS_B_high}(rng);
+  auto B = std::uniform_int_distribution<int64_t>{FLAGS_WNB_low,
+                                                  FLAGS_WNB_high}(rng);
   auto RESIDUAL_C = std::uniform_int_distribution<int64_t>{
       FLAGS_RESIDUAL_C_low, FLAGS_RESIDUAL_C_high}(rng);
   auto DILATION_C = std::uniform_int_distribution<int64_t>{
@@ -249,11 +255,55 @@ std::vector<tc::TensorInfo> WaveNetInputsGenerator::operator()() const {
 }
 
 namespace {
-DEFINE_uint32(N_low, 1, "N (power of 2) batch size");
-DEFINE_uint32(N_high, 5, "N (power of 2) batch size");
+// MLP part of the model
+DEFINE_uint32(B_low, 1, "Batch size");
+DEFINE_uint32(B_high, 128, "Batch size");
+DEFINE_uint32(N_low, 32, "W1_h == W2_w");
+DEFINE_uint32(N_high, 1024, "W1_h == W2_w");
+DEFINE_uint32(O_low, 32, "W2_h == W3_w");
+DEFINE_uint32(O_high, 256, "W2_h == W3_w");
+DEFINE_uint32(P_low, 32, "W3_h == W4_w");
+DEFINE_uint32(P_high, 128, "W3_h == W4_w");
+DEFINE_uint32(Q_low, 2, "W4_h");
+DEFINE_uint32(Q_high, 32, "W4_h");
+} // namespace
+
+std::vector<tc::TensorInfo> MLP3InputsGenerator::operator()() const {
+  auto B =
+      std::uniform_int_distribution<int64_t>{FLAGS_B_low, FLAGS_B_high}(rng);
+  auto N =
+      std::uniform_int_distribution<int64_t>{FLAGS_N_low, FLAGS_N_high}(rng);
+  auto O =
+      std::uniform_int_distribution<int64_t>{FLAGS_O_low, FLAGS_O_high}(rng);
+  auto P =
+      std::uniform_int_distribution<int64_t>{FLAGS_P_low, FLAGS_P_high}(rng);
+  auto Q =
+      std::uniform_int_distribution<int64_t>{FLAGS_Q_low, FLAGS_Q_high}(rng);
+
+  std::vector<int64_t> I{B, N};
+  std::vector<int64_t> W2{O, N};
+  std::vector<int64_t> B2{O};
+  std::vector<int64_t> W3{P, O};
+  std::vector<int64_t> B3{P};
+  std::vector<int64_t> W4{Q, P};
+  std::vector<int64_t> B4{Q};
+  DLDataType floatType{DLDataTypeCode::kDLFloat, 32, 1};
+
+  return {tc::TensorInfo{floatType, 32, I, tc::makeStridesFromSizes(I)},
+          tc::TensorInfo{floatType, 32, W2, tc::makeStridesFromSizes(W2)},
+          tc::TensorInfo{floatType, 32, B2, tc::makeStridesFromSizes(B2)},
+          tc::TensorInfo{floatType, 32, W3, tc::makeStridesFromSizes(W3)},
+          tc::TensorInfo{floatType, 32, B3, tc::makeStridesFromSizes(B3)},
+          tc::TensorInfo{floatType, 32, W4, tc::makeStridesFromSizes(W4)},
+          tc::TensorInfo{floatType, 32, B4, tc::makeStridesFromSizes(B4)}};
+}
+
+namespace {
+DEFINE_uint32(GNN_low, 1, "N (power of 2) batch size");
+DEFINE_uint32(GNN_high, 5, "N (power of 2) batch size");
 DEFINE_uint32(
     C_low,
-    5,
+    2,
     "Number (power of 2) of channels (that will get divided into groups)");
 DEFINE_uint32(
     C_high,
@@ -273,8 +323,8 @@ std::vector<tc::TensorInfo> GroupNormalizationInputsGenerator::operator()()
       std::uniform_int_distribution<int64_t>{FLAGS_H_low, FLAGS_H_high}(rng);
   auto W =
       std::uniform_int_distribution<int64_t>{FLAGS_W_low, FLAGS_W_high}(rng);
-  auto N = 1l << std::uniform_int_distribution<int64_t>{FLAGS_N_low,
-                                                        FLAGS_N_high}(rng);
+  auto N = 1l << std::uniform_int_distribution<int64_t>{FLAGS_GNN_low,
+                                                        FLAGS_GNN_high}(rng);
   auto C = 1l << std::uniform_int_distribution<int64_t>{FLAGS_C_low,
                                                         FLAGS_C_high}(rng);
   auto G = 1l << std::uniform_int_distribution<int64_t>{FLAGS_G_low,
@@ -292,6 +342,35 @@ std::vector<tc::TensorInfo> GroupNormalizationInputsGenerator::operator()()
           floatType, 32, gamma_sizes, tc::makeStridesFromSizes(gamma_sizes)},
       tc::TensorInfo{
           floatType, 32, beta_sizes, tc::makeStridesFromSizes(beta_sizes)}};
+}
+
+std::vector<tc::TensorInfo> BatchNormalizationInputsGenerator::operator()()
+    const {
+  auto H =
+      std::uniform_int_distribution<int64_t>{FLAGS_H_low, FLAGS_H_high}(rng);
+  auto W =
+      std::uniform_int_distribution<int64_t>{FLAGS_W_low, FLAGS_W_high}(rng);
+  auto N = 1l << std::uniform_int_distribution<int64_t>{FLAGS_GNN_low,
+                                                        FLAGS_GNN_high}(rng);
+  auto C = 1l << std::uniform_int_distribution<int64_t>{FLAGS_C_low,
+                                                        FLAGS_C_high}(rng);
+
+  std::vector<int64_t> I_sizes{N, C, H, W};
+  std::vector<int64_t> mean_sizes{C};
+  std::vector<int64_t> var_sizes{C};
+  std::vector<int64_t> scalar_sizes{1};
+  DLDataType floatType{DLDataTypeCode::kDLFloat, 32, 1};
+
+  return {
+      tc::TensorInfo{
+          floatType, 32, scalar_sizes, tc::makeStridesFromSizes(scalar_sizes)},
+      tc::TensorInfo{
+          floatType, 32, scalar_sizes, tc::makeStridesFromSizes(scalar_sizes)},
+      tc::TensorInfo{floatType, 32, I_sizes, tc::makeStridesFromSizes(I_sizes)},
+      tc::TensorInfo{
+          floatType, 32, mean_sizes, tc::makeStridesFromSizes(mean_sizes)},
+      tc::TensorInfo{
+          floatType, 32, var_sizes, tc::makeStridesFromSizes(var_sizes)}};
 }
 
 tc::KernelInfo makeKernelInfo(

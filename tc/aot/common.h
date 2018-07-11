@@ -56,9 +56,27 @@ class WaveNetInputsGenerator {
   mutable pcg64 rng;
 };
 
+class MLP3InputsGenerator {
+ public:
+  MLP3InputsGenerator();
+  std::vector<tc::TensorInfo> operator()() const;
+
+ private:
+  mutable pcg64 rng;
+};
+
 class GroupNormalizationInputsGenerator {
  public:
   GroupNormalizationInputsGenerator();
+  std::vector<tc::TensorInfo> operator()() const;
+
+ private:
+  mutable pcg64 rng;
+};
+
+class BatchNormalizationInputsGenerator {
+ public:
+  BatchNormalizationInputsGenerator();
   std::vector<tc::TensorInfo> operator()() const;
 
  private:
