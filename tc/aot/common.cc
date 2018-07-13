@@ -152,8 +152,12 @@ DEFINE_int64(KHW_low, 1, "Kernel Height/Width lower bound");
 DEFINE_int64(KHW_high, 9, "Kernel Height/Width upper bound");
 DEFINE_int64(HW_low, 8, "Image Height/Width lower bound");
 DEFINE_int64(HW_high, 64, "Image Height/Width upper bound");
-DEFINE_int64(CF_low, 4, "");
-DEFINE_int64(CF_high, 32, "");
+DEFINE_int64(C_lowgc, 1, "");
+DEFINE_int64(C_highgc, 32, "");
+DEFINE_int64(F_low, 1, "");
+DEFINE_int64(F_high, 32, "");
+DEFINE_int64(G_lowgc, 1, "");
+DEFINE_int64(G_highgc, 64, "");
 } // namespace
 
 std::vector<tc::TensorInfo> GCInputsGenerator::operator()() const {
@@ -161,12 +165,16 @@ std::vector<tc::TensorInfo> GCInputsGenerator::operator()() const {
                                                     FLAGS_KHW_high}(rng);
   auto HW =
       std::uniform_int_distribution<int64_t>{FLAGS_HW_low, FLAGS_HW_high}(rng);
-  auto CF =
-      std::uniform_int_distribution<int64_t>{FLAGS_CF_low, FLAGS_CF_high}(rng);
+  auto C =
+      std::uniform_int_distribution<int64_t>{FLAGS_C_lowgc, FLAGS_C_highgc}(rng);
+  auto F =
+      std::uniform_int_distribution<int64_t>{FLAGS_F_low, FLAGS_F_high}(rng);
+  auto G =
+      std::uniform_int_distribution<int64_t>{FLAGS_G_lowgc, FLAGS_G_highgc}(rng);
 
-  std::vector<int64_t> I_sizes{32, 32, CF, HW, HW};
-  std::vector<int64_t> W1_sizes{32, CF, CF, KHW, KHW};
-  std::vector<int64_t> B_sizes{32, CF};
+  std::vector<int64_t> I_sizes{32, G, C, HW, HW};
+  std::vector<int64_t> W1_sizes{G, F, C, KHW, KHW};
+  std::vector<int64_t> B_sizes{G, F};
   DLDataType floatType{DLDataTypeCode::kDLFloat, 32, 1};
 
   return {
