@@ -153,7 +153,9 @@ int main(int argc, char* argv[]) {
             std::cout << "Compilation attempts: " << tries.fetch_add(1)
                       << " Successes: " << successes.load() << std::endl;
             try {
-              auto [inputs, options] = gen.generate();
+              auto p = gen.generate();
+              auto& inputs = p.first;
+              auto& options = p.second;
               auto DLU = tc::makeDLConstTensorVector(inputs);
               auto DL = tc::extractRawPtrs(DLU);
               auto outputsInfo = tc::inferOutputTensorInfo(

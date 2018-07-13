@@ -150,7 +150,9 @@ template <typename InputsGenerator>
 std::pair<std::vector<tc::TensorInfo>, CudaMappingOptions>
 OptionsAndInputsGenerator<InputsGenerator>::generate() {
   std::lock_guard<std::mutex> lock{mtx};
-  for (auto& [inputs, options] : data) {
+  for (auto& p : data) {
+    auto& inputs = p.first;
+    auto& options = p.second;
     if (options.size() >= number_options)
       continue;
     OptionsGenerator og{inputs, numTileDims, numFixedTileDims};
