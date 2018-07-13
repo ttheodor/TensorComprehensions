@@ -155,7 +155,7 @@ struct PolyhedralMapperTest : public ::testing::Test {
     auto scop = Prepare(tc);
     auto mscop = MappedScop::makeWithOuterBlockInnerThreadStrategy(
         std::move(scop), mappingOptions);
-    return std::get<0>(mscop->codegen(specializedName));
+    return std::get<0>(mscop->codegen(specializedName, false));
   }
 
   static constexpr auto specializedName = "kernel_anon";
@@ -360,7 +360,7 @@ def fun(float(N, M) A, float(N, M) B) -> (C) {
   auto mscop = TileAndMapBlocksAndThreads(
       std::move(scop), {16ul, 16ul}, {256ul, 256ul}, {16ul, 16ul});
 
-  auto res = mscop->codegen(specializedName);
+  auto res = mscop->codegen(specializedName, false);
 
   std::string expected(
       R"RES(int b0 = blockIdx.x; int b1 = blockIdx.y; int b2 = blockIdx.z;
@@ -395,7 +395,7 @@ def fun(float(N, N, N, N) A, float(N, N) B, float(N, N) C, float(N, N) D)
 
   auto mscop = makeUnmapped(tc);
   // Don't intersect context with the domain and see what happens
-  auto res = std::get<0>(mscop->codegen(specializedName));
+  auto res = std::get<0>(mscop->codegen(specializedName, false));
 
   std::string expected(
       R"RES(int b0 = blockIdx.x; int b1 = blockIdx.y; int b2 = blockIdx.z;
@@ -446,7 +446,7 @@ def fun(float(N, N) A) -> (O)
 )TC";
 
   auto mscop = makeUnmapped(tc);
-  auto res = std::get<0>(mscop->codegen(specializedName));
+  auto res = std::get<0>(mscop->codegen(specializedName, false));
 
   string expected(
       R"RES(__global__ __launch_bounds__(1) void kernel_anon(int32 N, float32* pO, const float32* pA) {
@@ -475,7 +475,7 @@ def fun(float(N, N) A, float(N, N) B, float(N) C) -> (O)
 
   auto mscop = makeUnmapped(tc);
   mscop->fixParameters<int>({{"N", 512}});
-  auto res = std::get<0>(mscop->codegen(specializedName));
+  auto res = std::get<0>(mscop->codegen(specializedName, false));
 
   string expected =
       R"RES(__global__ __launch_bounds__(1) void kernel_anon(int32 N, float32* pO, const float32* pA, const float32* pB, const float32* pC) {
@@ -523,7 +523,7 @@ TEST_F(PolyhedralMapperTest, MergedContexts) {
   scop->specializeToContext();
 
   auto mscop = TileAndMapThreads(std::move(scop), {16, 16}, {32ul, 8ul});
-  auto res = std::get<0>(mscop->codegen(specializedName));
+  auto res = std::get<0>(mscop->codegen(specializedName, false));
   ASSERT_TRUE(std::string::npos != res.find(kExpectedMatmul_64_64_64)) << res;
 }
 
@@ -599,7 +599,7 @@ TEST_F(PolyhedralMapperTest, Unroll1D) {
   scop->fixParameters<int>({{"N", 1024}, {"M", 1024}});
   auto mscop = MappedScop::makeWithOuterBlockInnerThreadStrategy(
       std::move(scop), mappingOptions);
-  auto code = std::get<0>(mscop->codegen(specializedName));
+  auto code = std::get<0>(mscop->codegen(specializedName, false));
   std::string expected("C[(64 * b0 + c2)][(t0 + 64 * b1)]");
   ASSERT_TRUE(code.find(expected) != std::string::npos) << code;
 }
@@ -618,7 +618,7 @@ TEST_F(PolyhedralMapperTest, Unroll2D) {
   scop->fixParameters<int>({{"N", 1024}, {"M", 1024}});
   auto mscop = MappedScop::makeWithOuterBlockInnerThreadStrategy(
       std::move(scop), mappingOptions);
-  auto code = std::get<0>(mscop->codegen(specializedName));
+  auto code = std::get<0>(mscop->codegen(specializedName, false));
   std::string expected("C[(t1 + 64 * b0 + 32)][(t0 + 64 * b1 + 32)]");
   ASSERT_TRUE(code.find(expected) != std::string::npos);
 }
@@ -637,7 +637,7 @@ def fun(float(N) I) -> (O) {
   auto scop = Prepare(tc);
   auto mscop = MappedScop::makeWithOuterBlockInnerThreadStrategy(
       std::move(scop), DefaultOptions());
-  auto codeAndLaunchBounds = mscop->codegen(specializedName);
+  auto codeAndLaunchBounds = mscop->codegen(specializedName, false);
   USING_MAPPING_SHORT_NAMES(BX, BY, BZ, TX, TY, TZ);
   EXPECT_EQ(1u, BY.mappingSize(std::get<1>(codeAndLaunchBounds).view));
   EXPECT_EQ(1u, TY.mappingSize(std::get<1>(codeAndLaunchBounds).view));
@@ -1109,7 +1109,7 @@ TEST_F(PolyhedralMapperTest, EmptyMapping) {
   scop->fixParameters<int>({{"N", 1024}, {"K", 36864}});
   auto mscop = MappedScop::makeWithOuterBlockInnerThreadStrategy(
       std::move(scop), mappingOptions);
-  mscop->codegen(specializedName);
+  mscop->codegen(specializedName, false);
 }
 
 TEST_F(PolyhedralMapperTest, ModulusConstantRHS) {

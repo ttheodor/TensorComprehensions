@@ -37,11 +37,11 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const typename Backend::MappingOptionsType& options) {
+    const typename Backend::MappingOptionsType& options, bool dropExternC) {
   auto parsedTcs = detail::parse(tc);
   TC_CHECK_EQ(parsedTcs.count(entryPoint), 1u)
       << "attempting to access undefined function " << entryPoint;
-  return compile<Backend>(parsedTcs[entryPoint], inputs, options);
+  return compile<Backend>(parsedTcs[entryPoint], inputs, options, dropExternC);
 }
 
 template <typename Backend>
@@ -49,7 +49,8 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
     lang::TreeRef tcDefinition,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const typename Backend::MappingOptionsType& options) {
+    const typename Backend::MappingOptionsType& options,
+    bool dropExternC) {
   using CompilationResultType = typename Backend::CompilationResultType;
 
   auto inputsInfo = makeTensorInfoVector(inputs);
@@ -64,7 +65,8 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
       halideComponents,
       inputs,
       /* TODO outputs, */
-      options);
+      options,
+      dropExternC);
   return std::unique_ptr<typename Backend::ExecutorType>(
       new typename Backend::ExecutorType(
           inputsInfo, outputsInfo, halideComponents, compilationResult));
@@ -76,7 +78,8 @@ typename Backend::CompilationResultType compileToSource(
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const typename Backend::MappingOptionsType& options) {
+    const typename Backend::MappingOptionsType& options,
+    bool dropExternC) {
   auto parsedTcs = detail::parse(tc);
   auto tcDefinition = parsedTcs.at(entryPoint);
 
@@ -92,7 +95,8 @@ typename Backend::CompilationResultType compileToSource(
       halideComponents,
       inputs,
       /* TODO outputs, */
-      options);
+      options,
+      dropExternC);
 }
 
 } // namespace tc

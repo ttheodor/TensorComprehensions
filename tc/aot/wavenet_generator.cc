@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
 
               auto t0 = high_resolution_clock::now();
               auto res = tc::compileToSource<tc::CudaBackend>(
-                  TC_WAVENET, TC_WAVENET1_NAME, DL, options);
+                  TC_WAVENET, TC_WAVENET1_NAME, DL, options, true);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "

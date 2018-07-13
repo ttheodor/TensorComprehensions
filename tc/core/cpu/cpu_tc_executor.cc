@@ -43,7 +43,8 @@ CpuCompilationResult CpuBackend::compileWithTcMapper(
     tc2halide::HalideComponents halideComponents,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const CpuMappingOptions& options) {
+    const CpuMappingOptions& options,
+    bool) {
   LOG(ERROR) << "NYI: CpuBackend::compileWithTcMapper";
   return CpuCompilationResult{std::string("source"),
                               std::string("specializedName"),

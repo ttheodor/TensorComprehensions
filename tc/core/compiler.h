@@ -72,7 +72,8 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const typename Backend::MappingOptionsType& options);
+    const typename Backend::MappingOptionsType& options,
+    bool dropExternC);
 
 template <typename Backend>
 typename Backend::CompilationResultType compileToSource(
@@ -80,8 +81,8 @@ typename Backend::CompilationResultType compileToSource(
     const std::string& entryPoint,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const typename Backend::MappingOptionsType& options);
-
+    const typename Backend::MappingOptionsType& options,
+    bool dropExternC);
 
 /// Given a TC representation as a TC + TC function name entryPoint and a list
 /// of input tensors that match the definition in the TC function definition
@@ -114,7 +115,8 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
     lang::TreeRef tcDefinition,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const typename Backend::MappingOptionsType& options);
+    const typename Backend::MappingOptionsType& options,
+    bool dropExternC);
 
 /// Given a TC representation as a TreeRef and a list of input tensors that
 /// match the definition in the TC function definition (in positional order),

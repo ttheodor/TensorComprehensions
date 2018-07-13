@@ -35,7 +35,7 @@ std::unique_ptr<typename Backend::ExecutorType> compile(
     const typename Backend::MappingOptionsType& options) {
   auto inputDLTensors = makeDLConstTensors(inputs);
   return tc::compile<Backend>(
-      tc, entryPoint, extractRawPtrs(inputDLTensors), options);
+      tc, entryPoint, extractRawPtrs(inputDLTensors), options, false);
 }
 
 template <typename Executor>

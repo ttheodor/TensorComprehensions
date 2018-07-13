@@ -166,7 +166,8 @@ int main(int argc, char* argv[]) {
                   TC_GroupNormalization,
                   TC_GroupNormalizationSingleKernel_NAME,
                   DL,
-                  options);
+                  options,
+                  true);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "

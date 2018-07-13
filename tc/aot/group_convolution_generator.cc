@@ -147,7 +147,7 @@ int main(int argc, char* argv[]) {
 
               auto t0 = high_resolution_clock::now();
               auto res = tc::compileToSource<tc::CudaBackend>(
-                  gc_tc, "group_convolution", DL, options);
+                  gc_tc, "group_convolution", DL, options, true);
               auto t1 = high_resolution_clock::now();
               auto compilation_time = t1 - t0;
               std::cout << "Compilation time: "

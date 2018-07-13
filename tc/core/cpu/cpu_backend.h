@@ -84,6 +84,7 @@ struct CpuBackend {
       tc2halide::HalideComponents halideComponents,
       const std::vector<const DLConstTensor*>& inputs,
       /* TODO: in the future also pass outputs for stride and alignment */
-      const MappingOptionsType& options);
+      const MappingOptionsType& options,
+      bool);
 };
 } // namespace tc

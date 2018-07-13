@@ -115,7 +115,8 @@ class TcOp : public Operator<Context> {
           tc_,
           tc_name_,
           raw_input_dl_tensors_,
-          is_backward_ ? grad_mapping_options_ : mapping_options_);
+          is_backward_ ? grad_mapping_options_ : mapping_options_,
+          false);
       compiled_ = true;
     }
 

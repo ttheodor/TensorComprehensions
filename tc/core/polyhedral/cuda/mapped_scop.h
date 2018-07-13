@@ -122,7 +122,8 @@ class MappedScop {
   // Generate CUDA code at the current state of transformation provided a
   // name for the generated function.
   std::tuple<std::string, tc::Grid, tc::Block> codegen(
-      const std::string& specializedName) const;
+      const std::string& specializedName,
+      bool dropExternC) const;
 
   // Accessors..
   // Const accessor to schedule of underlying Scop.

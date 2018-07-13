@@ -73,7 +73,8 @@ CudaCompilationResult CudaBackend::compileWithTcMapper(
     tc2halide::HalideComponents halideComponents,
     const std::vector<const DLConstTensor*>& inputs,
     /* TODO: in the future also pass outputs for stride and alignment info */
-    const CudaMappingOptions& options) {
+    const CudaMappingOptions& options,
+    bool dropExternC) {
   // A bit chicken-and-eggy, need scop from TC to have the space to build the
   // context to specialize the scop..
   auto scop = polyhedral::Scop::makeScop(
@@ -100,7 +101,8 @@ CudaCompilationResult CudaBackend::compileWithTcMapper(
   std::string source;
   Grid grid;
   Block block;
-  std::tie(source, grid, block) = mappedScop->codegen(specializedName);
+  std::tie(source, grid, block) =
+      mappedScop->codegen(specializedName, dropExternC);
   LOG_IF(INFO, FLAGS_dump_cuda) << "generatedCuda: " << source << "\n"
                                 << "grid: " << grid << " block: " << block;
 

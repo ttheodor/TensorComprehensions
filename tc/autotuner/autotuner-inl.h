@@ -100,8 +100,8 @@ void TuningHarness<Backend>::doCompile(SearchStrategy& searchStrategy) {
           LOG(INFO) << "[COMPILE] Start compilation @:" << current;
           LOG_LINE_BY_LINE(INFO, ssInfo);
         }
-        pExecutor =
-            tc::compile<Backend>(tcTree_, inputs_.begin()->second, options);
+        pExecutor = tc::compile<Backend>(
+            tcTree_, inputs_.begin()->second, options, false);
         LOG_IF(INFO, FLAGS_debug_tuner) << "[COMPILE] Done compilation";
       } catch (const std::exception& e) {
         LOG(WARNING) << "[TUNER][COMPILE] failed compilation: " << e.what();

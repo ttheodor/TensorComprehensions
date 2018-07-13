@@ -928,7 +928,8 @@ std::unique_ptr<MappedScop> makeSpecializedMappedScop(
 // the context of the original scop as top-level
 // context node in schedule tree.
 std::tuple<std::string, tc::Grid, tc::Block> MappedScop::codegen(
-    const std::string& specializedName) const {
+    const std::string& specializedName,
+    bool dropExternC) const {
   validate(schedule());
 
   auto mappedScopForCodegen = makeSpecializedMappedScop(*this);
@@ -944,7 +945,13 @@ std::tuple<std::string, tc::Grid, tc::Block> MappedScop::codegen(
     code << code::cuda::common;
     code << code::cuda::cubBlockReduce;
   }
-  code << emitCudaKernel(specializedName, *mappedScopForCodegen) << std::endl;
+  if (dropExternC) {
+    code << emitCudaKernel(specializedName, *mappedScopForCodegen) << std::endl;
+  } else {
+    code << "extern \"C\" {" << std::endl
+         << emitCudaKernel(specializedName, *mappedScopForCodegen) << "}"
+         << std::endl;
+  }
 
   return std::make_tuple(
       code.str(),

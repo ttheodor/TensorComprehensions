@@ -108,7 +108,7 @@ def fun(float(N,M,K,L) A, float(N,M,K,L) B) -> (C) {
                                            {"L", problemSizes[3]}});
     auto& scop = const_cast<Scop&>(mscop->scop());
     scop.promoteEverythingAt(childPos);
-    return std::get<0>(mscop->codegen("fun"));
+    return std::get<0>(mscop->codegen("fun", false));
   }
 };
 
@@ -463,7 +463,7 @@ def fun(float(N,K) A, float(K,M) B, float(N,M) C) -> (O) {
   }
 
   std::string emitCode(const std::unique_ptr<MappedScop>& mscop) {
-    return std::get<0>(mscop->codegen("fun"));
+    return std::get<0>(mscop->codegen("fun", false));
   }
 
   std::string emitCode(
@@ -723,7 +723,7 @@ def strided(float(N,M) I) -> (O) {
 
   // Additionally check that copies look fine.
   scop.promoteEverythingAt({0, 0, 0});
-  auto code = std::get<0>(mscop->codegen("strided"));
+  auto code = std::get<0>(mscop->codegen("strided", false));
   EXPECT_TRUE(
       code.find("_I_0[c2][c3] = I[32 * b1 + c2][64 * b0 + 2 * c3 + 1]") !=
       std::string::npos)
