@@ -115,8 +115,8 @@ int main(int argc, char* argv[]) {
 
   uint64_t id = 0;
 
-  std::atomic_size_t tries{0};
-  std::atomic_size_t successes{0};
+  std::atomic<uint64_t> tries{0};
+  std::atomic<uint64_t> successes{0};
   using namespace std;
   using namespace chrono;
   std::mutex mtx;
