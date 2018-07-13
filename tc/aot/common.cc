@@ -43,10 +43,19 @@ tc::CudaMappingOptions OptionsGenerator::operator()() const {
                      .tileImperfectlyNested(makeBool())
                      .unroll(makeUnroll())
                      .useSharedMemory(makeBool())
+                     .usePrivateMemory(makeBool())
                      .useReadOnlyCache(makeBool())
                      .matchLibraryCalls(false);
   options.unrollCopyShared(
       options.proto().use_shared_memory() ? makeBool() : false);
+  options.sharedDepth(
+      options.proto().use_shared_memory()
+          ? std::uniform_int_distribution<uint64_t>{0, 7}(rng)
+          : 0);
+  options.privateDepth(
+      options.proto().use_private_memory()
+          ? std::uniform_int_distribution<uint64_t>{0, 10}(rng)
+          : 0);
 
   return options;
 };
