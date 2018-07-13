@@ -197,7 +197,7 @@ int main(int argc, char* argv[]) {
   std::vector<std::thread> workers;
 
   tc::AotBuf kis;
-  std::atomic_uint64_t counter{0};
+  std::atomic<uint64_t> counter{0};
 
   for (int64_t t = 0; t < FLAGS_threads; ++t) {
     workers.emplace_back(
