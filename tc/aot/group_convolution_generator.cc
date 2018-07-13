@@ -80,7 +80,7 @@ bool stillGoodAfterTighening(const tc::CudaCompilationResult& res) {
     return false;
   auto b = blocksPerGrid(res.grid);
 
-  if (b < 56)
+  if (b < 20)
     return false;
   return true;
 }

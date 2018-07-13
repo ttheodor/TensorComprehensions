@@ -114,12 +114,12 @@ std::vector<uint64_t> OptionsGenerator::makeGrid() const {
     return v[0] < 2147483648 and v[1] < 65536 and v[2] < 65536;
   };
   // there are 56 SMs on a P100
-  auto min56 = [](const std::vector<uint64_t>& v) {
-    return v[0] * v[1] * v[2] >= 56;
+  auto min20 = [](const std::vector<uint64_t>& v) {
+    return v[0] * v[1] * v[2] >= 20;
   };
   while (true) {
     auto v = makeCudaDim();
-    if (check(v) and min56(v))
+    if (check(v) and min20(v))
       return v;
   }
 }
