@@ -102,6 +102,7 @@ OptionsCacheValue<Backend>::toProtobuf() const {
   for (auto d : runtimes) {
     buf_value.add_recorded_runtimes(d.toMicroSeconds());
   }
+  buf_value.set_cuda(cuda);
   return buf_value;
 }
 
@@ -113,7 +114,9 @@ OptionsCacheValue<Backend> OptionsCacheValue<Backend>::fromProtobuf(
     runtimes.push_back(Duration::fromMicroSeconds(d));
   }
   return OptionsCacheValue<Backend>{
-      runtimes, typename Backend::MappingOptionsType(proto.kernel_options())};
+      runtimes,
+      typename Backend::MappingOptionsType(proto.kernel_options()),
+      proto.cuda()};
 }
 
 template <typename Backend>
@@ -178,13 +181,14 @@ void OptionsCache<Backend>::recordRuntime(
     const std::vector<TensorInfo>& outputs,
     const std::string& backendStr,
     const typename Backend::MappingOptionsType& options,
+    const std::string& cuda,
     Duration duration) {
   std::lock_guard<std::mutex> lock(mutex);
   ++numberCacheAttempts;
   OptionsCacheKey key{tc, inputs, outputs, backendStr};
   auto range = store_.equal_range(key);
   for (auto it = range.first; it != range.second; ++it) {
-    if (it->second.mappingOptions == options) {
+    if (it->second.mappingOptions == options and it->second.cuda == cuda) {
       // key exists, append to it and return
       it->second.runtimes.push_back(duration);
       return;
@@ -193,7 +197,8 @@ void OptionsCache<Backend>::recordRuntime(
   // key does not exist, emplace a new key, value
   store_.emplace(
       key,
-      OptionsCacheValue<Backend>{std::vector<Duration>{duration}, options});
+      OptionsCacheValue<Backend>{
+          std::vector<Duration>{duration}, options, cuda});
 }
 
 namespace detail {

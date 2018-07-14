@@ -108,6 +108,7 @@ TEST(RestoreCandidates, Hit) {
       makeTensorInfoVector(extractRawPtrs(outputDLTensors)),
       CudaGPUInfo::GPUInfo().getCudaDeviceStr(),
       options,
+      "",
       timings.kernelRuntime);
 
   {
@@ -120,6 +121,7 @@ TEST(RestoreCandidates, Hit) {
         makeTensorInfoVector(extractRawPtrs(outputDLTensors)),
         CudaGPUInfo::GPUInfo().getCudaDeviceStr(),
         options,
+        "",
         timings.kernelRuntime);
   }
 

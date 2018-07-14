@@ -30,6 +30,7 @@ message OptionsCacheKeyProto {
 message CudaOptionsCacheValueProto{
   required CudaMappingOptionsProto kernel_options = 1;
   repeated uint64 recorded_runtimes = 2;
+  required string cuda = 3;
 }
 
 /*

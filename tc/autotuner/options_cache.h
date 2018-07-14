@@ -70,6 +70,7 @@ struct OptionsCacheValue {
 
   std::vector<Duration> runtimes;
   typename Backend::MappingOptionsType mappingOptions;
+  std::string cuda;
 };
 
 /**
@@ -126,6 +127,7 @@ struct OptionsCache {
       const std::vector<TensorInfo>& outputs,
       const std::string& backendStr,
       const typename Backend::MappingOptionsType& options,
+      const std::string& cuda,
       Duration duration);
 
   /// Returns the top-K mapping options with the best median runtime for a

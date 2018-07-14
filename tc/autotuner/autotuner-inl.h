@@ -233,6 +233,7 @@ void TuningHarness<Backend>::doEvaluate(
         makeTensorInfoVector(outputs),
         Backend::backendString(),
         options,
+        pExecutor->compiledSource,
         prof);
 
     // Save best time under lock

@@ -126,7 +126,7 @@ class OptionsCacheTest : public ::testing::Test {
     auto duration = tc::Duration::fromMicroSeconds(us);
 
     optionsCache->recordRuntime(
-        canonical, inputTIs, outputTIs, backendStr(), options, duration);
+        canonical, inputTIs, outputTIs, backendStr(), options, "", duration);
   }
 };
 
@@ -604,6 +604,7 @@ class MatMulTester {
         tc::makeTensorInfoVector(tc::extractRawPtrs(outputDLTensors)),
         backendStr(),
         options,
+        "",
         timings.kernelRuntime);
 
     at::Tensor diff = outputs_[0].sub(inputs_[0].mm(inputs_[1]));
@@ -654,6 +655,7 @@ class ConvolutionTester {
         tc::makeTensorInfoVector(tc::extractRawPtrs(outputDLTensors)),
         backendStr(),
         options,
+        "",
         timings.kernelRuntime);
 
     at::Tensor expected = at::conv2d(inputs_[0], inputs_[1], inputs_[2]);
