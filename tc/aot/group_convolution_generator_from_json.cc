@@ -110,50 +110,59 @@ tc::FusionStrategy toStrategy(const json& i) {
   }
 }
 
-std::vector<uint64_t> toCudaDim(const json& i, char prefix) {
-  auto x = get(i, prefix + std::string{"x"});
-  auto y = get(i, prefix + std::string{"y"});
-  auto z = get(i, prefix + std::string{"z"});
+uint64_t oneIfzero(uint64_t x) {
+  return x == 0 ? 1 : x;
+}
 
-  std::vector<uint64_t> dims;
-  auto bx = [&x]() {
+std::vector<uint64_t> toCudaThreads(const json& i) {
+  uint64_t xl = oneIfzero(get(i, "bx").at("lower"));
+  uint64_t xu = get(i, "bx").at("upper");
+  CHECK_LE(xl, 1024ul);
+  CHECK_LE(xu, 1024ul);
+
+  uint64_t yl = oneIfzero(get(i, "by").at("lower"));
+  uint64_t yu = get(i, "by").at("upper");
+  CHECK_LE(yl, 1024ul);
+  CHECK_LE(yu, 1024ul);
+
+  uint64_t zl = oneIfzero(get(i, "bz").at("lower"));
+  uint64_t zu = get(i, "bz").at("upper");
+  CHECK_LE(zl, 64ul);
+  CHECK_LE(zu, 64ul);
+
+  CHECK_LE(xl * yl * zl, 1024ul);
+
+  while (xl != xu and ((xl + 1) * yl * zl) <= 1024) {
+    ++xl;
+  }
+
+  while (yl != yu and (xl * (yl + 1) * zl) <= 1024) {
+    ++yl;
+  }
+
+  while (zl != zu and (xl * yl * (zl + 1)) <= 1024) {
+    ++zl;
+  }
+
+  return {xl, yl, zl};
+}
+
+std::vector<uint64_t> toCudaBlocks(const json& i) {
+  auto getSize = [](const auto& x) {
     uint64_t l = x.at("lower");
     uint64_t u = x.at("upper");
     if (l == u) {
       CHECK_NE(l, 0ul);
       return l;
     }
-    if (l > 0)
-      return l;
-    return l + 1;
-  }();
-  dims.push_back(bx);
-  auto getF = [](auto f) {
-    uint64_t l = f.at("lower");
-    return l;
+    return oneIfzero(l);
   };
-  auto by = getF(y);
-  auto bz = getF(z);
-  if (by > 0)
-    dims.push_back(by);
-  if (bz > 0) {
-    if (by == 0)
-      dims.push_back(1);
-    dims.push_back(bz);
-  }
-  return dims;
-}
 
-auto toCudaThreads(const json& i) {
-  return toCudaDim(i, 'b');
-}
+  auto x = get(i, "gx");
+  auto y = get(i, "gy");
+  auto z = get(i, "gz");
 
-auto toCudaBlocks(const json& i) {
-  return toCudaDim(i, 'g');
-}
-
-uint64_t oneIfzero(uint64_t x) {
-  return x == 0 ? 1 : x;
+  return {getSize(x), getSize(y), getSize(z)};
 }
 
 tc::CudaMappingOptions make_options(const json& j) {
