@@ -188,8 +188,9 @@ int main(int argc, char* argv[]) {
               if (successes.load() % 100 == 0) {
                 write_proto();
               }
-            } catch (...) {
-              break;
+            } catch (std::exception& e) {
+              std::cout << "Something went wrong: " << e.what() << std::endl;
+              continue;
             }
           }
         });
