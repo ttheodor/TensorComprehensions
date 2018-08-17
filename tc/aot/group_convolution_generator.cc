@@ -138,10 +138,12 @@ int main(int argc, char* argv[]) {
           while (successes.load() < total) {
             std::cout << "Compilation attempts: " << tries.fetch_add(1)
                       << " Successes: " << successes.load() << std::endl;
+            std::vector<tc::TensorInfo> inputs;
+            auto options = tc::CudaMappingOptions::makeNaiveMappingOptions();
             try {
               auto p = gen.generate();
-              auto& inputs = p.first;
-              auto& options = p.second;
+              inputs = p.first;
+              options = p.second;
               auto DLU = tc::makeDLConstTensorVector(inputs);
               auto DL = tc::extractRawPtrs(DLU);
               auto outputsInfo =
@@ -156,17 +158,6 @@ int main(int argc, char* argv[]) {
                         << duration_cast<milliseconds>(compilation_time).count()
                         << "ms" << std::endl;
               if (not stillGoodAfterTighening(res)) {
-                // std::cout << "Not enough threads and/or blocks. Discarding...
-                // "
-                //<< std::endl;
-                // std::cout << tc::CudaMappingOptionsAsCpp(opts) << std::endl;
-                // std::cout << res.grid.view.proto.x() << ' '
-                //<< res.grid.view.proto.y() << ' '
-                //<< res.grid.view.proto.z() << std::endl;
-                // std::cout << res.block.view.proto.x() << ' '
-                //<< res.block.view.proto.y() << ' '
-                //<< res.block.view.proto.z() << std::endl;
-                // std::cout << res.source << std::endl;
                 gen.remove(inputs, options);
                 continue;
               }
@@ -190,6 +181,7 @@ int main(int argc, char* argv[]) {
               }
             } catch (std::exception& e) {
               std::cout << "Something went wrong: " << e.what() << std::endl;
+              gen.remove(inputs, options);
               continue;
             }
           }
