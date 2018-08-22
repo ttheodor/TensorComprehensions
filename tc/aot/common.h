@@ -173,7 +173,8 @@ template <typename InputsGenerator>
 void OptionsAndInputsGenerator<InputsGenerator>::remove(
     const std::vector<tc::TensorInfo>& inputs,
     const CudaMappingOptions& options) {
-  data.at(inputs).erase(options);
+  if (data.count(inputs) > 0)
+    data.at(inputs).erase(options);
 }
 
 } // namespace tc
