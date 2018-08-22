@@ -97,7 +97,7 @@ auto loadProto(const std::string& filename) {
 int main(int argc, char* argv[]) {
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
-  static tc::AotBuf kis;
+  tc::AotBuf kis;
   if (fs::exists(FLAGS_output)) {
     std::cout << FLAGS_output << " already exists. Will reload and override."
               << std::endl;
@@ -119,88 +119,115 @@ int main(int argc, char* argv[]) {
   std::atomic<uint64_t> successes{0};
   using namespace std;
   using namespace chrono;
-  std::mutex mtx;
+  std::mutex mtx_ids;
   std::vector<std::thread> workers;
   uint64_t total = FLAGS_number_options * FLAGS_number_inputs;
 
-  static auto write_proto = []() {
-    std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
-    if (not kis.SerializeToOstream(&output)) {
-      std::cout << "Serialization failed" << std::endl;
-    }
-  };
-
   tc::OptionsAndInputsGenerator<tc::GCInputsGenerator> gen{
       FLAGS_number_inputs, FLAGS_number_options, 3, 2};
-  for (int64_t t = 0; t < FLAGS_threads; ++t) {
-    workers.emplace_back(
-        [&gen, &gc_tc, &tries, &successes, total, &id, &used_ids, &mtx]() {
-          while (successes.load() < total) {
-            std::cout << "Compilation attempts: " << tries.fetch_add(1)
-                      << " Successes: " << successes.load() << std::endl;
-            std::vector<tc::TensorInfo> inputs;
-            auto options = tc::CudaMappingOptions::makeNaiveMappingOptions();
-            try {
-              auto p = gen.generate();
-              inputs = p.first;
-              options = p.second;
-              auto DLU = tc::makeDLConstTensorVector(inputs);
-              auto DL = tc::extractRawPtrs(DLU);
-              auto outputsInfo =
-                  tc::inferOutputTensorInfo(gc_tc, "group_convolution", DL);
 
-              auto t0 = high_resolution_clock::now();
-              auto res = tc::compileToSource<tc::CudaBackend>(
-                  gc_tc, "group_convolution", DL, options, true);
-              auto t1 = high_resolution_clock::now();
-              auto compilation_time = t1 - t0;
-              std::cout << "Compilation time: "
-                        << duration_cast<milliseconds>(compilation_time).count()
-                        << "ms" << std::endl;
-              if (not stillGoodAfterTighening(res)) {
-                gen.remove(inputs, options);
-                continue;
-              }
-              ++successes;
-              std::lock_guard<std::mutex> lock{mtx};
-              while (used_ids.count(id) > 0) {
-                ++id;
-              }
-              used_ids.insert(id);
-              *kis.add_kernels() = makeKernelInfo(
-                  res,
-                  id,
-                  gc_tc,
-                  inputs,
-                  outputsInfo,
-                  options,
-                  compilation_time);
-              ++id;
-              if (successes.load() % 100 == 0) {
-                write_proto();
-              }
-            } catch (std::exception& e) {
-              std::cout << "Something went wrong: " << e.what() << std::endl;
-              gen.remove(inputs, options);
-              continue;
+  std::vector<std::vector<tc::TensorInfo>> inputs;
+  std::generate_n(
+      std::back_inserter(inputs), FLAGS_number_inputs, tc::GCInputsGenerator{});
+  std::vector<std::vector<tc::KernelInfo>> generated_kernels{
+      FLAGS_number_inputs};
+  std::vector<std::mutex> data_mtxs{FLAGS_number_inputs};
+
+  for (int64_t t = 0; t < FLAGS_threads; ++t) {
+    workers.emplace_back([&gc_tc,
+                          &tries,
+                          &successes,
+                          total,
+                          &id,
+                          &used_ids,
+                          &mtx_ids,
+                          &inputs,
+                          &generated_kernels,
+                          &data_mtxs]() {
+      while (true) {
+        auto idx = FLAGS_number_inputs;
+        for (uint64_t i = 0; i < FLAGS_number_inputs; ++i) {
+          std::lock_guard<std::mutex> lock{data_mtxs[i]};
+          if (generated_kernels[i].size() < FLAGS_number_options) {
+            idx = i;
+            break;
+          }
+        }
+        if (idx == FLAGS_number_inputs) {
+          break;
+        }
+
+        auto DLU = tc::makeDLConstTensorVector(inputs[idx]);
+        auto DL = tc::extractRawPtrs(DLU);
+        auto outputsInfo =
+            tc::inferOutputTensorInfo(gc_tc, "group_convolution", DL);
+
+        tc::OptionsGenerator og{inputs[idx], 3, 2};
+
+        while (true) {
+          {
+            std::lock_guard<std::mutex> lock{data_mtxs[idx]};
+            if (generated_kernels[idx].size() >= FLAGS_number_options) {
+              break;
             }
           }
-        });
+
+          std::cout << "Compilation attempts: " << tries.fetch_add(1)
+                    << " Successes: " << successes.load() << std::endl;
+
+          auto options = og();
+          tc::CudaBackend::CompilationResultType res;
+          auto t0 = high_resolution_clock::now();
+          try {
+            res = tc::compileToSource<tc::CudaBackend>(
+                gc_tc, "group_convolution", DL, options, true);
+          } catch (std::exception& e) {
+            std::cout << "Something went wrong: " << e.what() << std::endl;
+            continue;
+          }
+          auto t1 = high_resolution_clock::now();
+          auto compilation_time = t1 - t0;
+          std::cout << "Compilation time: "
+                    << duration_cast<milliseconds>(compilation_time).count()
+                    << "ms" << std::endl;
+          if (not stillGoodAfterTighening(res)) {
+            continue;
+          }
+          ++successes;
+          std::lock_guard<std::mutex> lock_ids{mtx_ids};
+          while (used_ids.count(id) > 0) {
+            ++id;
+          }
+          used_ids.insert(id);
+          auto ki = makeKernelInfo(
+              res,
+              id,
+              gc_tc,
+              inputs[idx],
+              outputsInfo,
+              options,
+              compilation_time);
+
+          std::lock_guard<std::mutex> lock_data{data_mtxs[idx]};
+          generated_kernels[idx].push_back(std::move(ki));
+        }
+      }
+    });
   }
-
-  auto handler = [](int) {
-    write_proto();
-    std::abort();
-  };
-
-  std::signal(SIGINT, handler);
-  std::signal(SIGTERM, handler);
-  std::signal(SIGKILL, handler);
 
   for (auto& t : workers) {
     t.join();
   }
-  write_proto();
+
+  for (const auto& kernel : generated_kernels) {
+    for (const auto& ki : kernel) {
+      *kis.add_kernels() = ki;
+    }
+  }
+  std::ofstream output{FLAGS_output, std::ios::binary | std::ios::trunc};
+  if (not kis.SerializeToOstream(&output)) {
+    std::cout << "Serialization failed" << std::endl;
+  }
 
   return 0;
 }
