@@ -610,7 +610,7 @@ void translateComprehension(
 
   // Tag reductions as such
   if (comprehension.assignment()->kind() != '=') {
-    rhs = reductionUpdate(rhs);
+    //rhs = reductionUpdate(rhs);
   }
 
   // Bind any scalar params on the rhs to their parameter objects.

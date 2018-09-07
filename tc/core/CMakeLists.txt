@@ -98,92 +98,108 @@ install(
   DESTINATION lib
 )
 
-set(TC_CUDA_CROSS_COMPILE_FILES
+#set(TC_CUDA_CROSS_COMPILE_FILES
+    #cuda/cuda_mapping_options.cc
+    #cuda/cuda_mapping_options_cpp_printer.cc
+    #polyhedral/cuda/codegen.cc
+    #polyhedral/cuda/mapped_scop.cc
+    #polyhedral/cuda/mapping_types.cc
+    #polyhedral/cuda/memory_promotion_heuristic.cc
+    #polyhedral/cuda/tighten_launch_bounds.cc
+#)
+
+
+add_library(
+    tc_code_opencl
+
+    SHARED
+    opencl/opencl_backend.cc
+    #opencl/opencl_mapping_options.cc
     cuda/cuda_mapping_options.cc
     cuda/cuda_mapping_options_cpp_printer.cc
-    polyhedral/cuda/codegen.cc
-    polyhedral/cuda/mapped_scop.cc
-    polyhedral/cuda/mapping_types.cc
-    polyhedral/cuda/memory_promotion_heuristic.cc
-    polyhedral/cuda/tighten_launch_bounds.cc
-)
+    polyhedral/opencl/codegen.cc
+    polyhedral/opencl/mapped_scop.cc
+    polyhedral/opencl/mapping_types.cc
+    polyhedral/opencl/memory_promotion_heuristic.cc
+    polyhedral/opencl/tighten_launch_bounds.cc
 
+)
 ################################################################################
 # tc_core_cuda_no_sdk
 #
 # Core CUDA cross-compilation library for compiling to CUDA and not running
 # Builds **without** the CUDA SDK and used in cross-compilation tests
 ################################################################################
-add_library(
-  tc_core_cuda_no_sdk
+#add_library(
+  #tc_core_cuda_no_sdk
 
-  SHARED
+  #SHARED
 
-  ${TC_CUDA_CROSS_COMPILE_FILES}
-)
+  #${TC_CUDA_CROSS_COMPILE_FILES}
+#)
 # Sets NO_CUDA_SDK to compile without SDK
-set_target_properties(tc_core_cuda_no_sdk
-                      PROPERTIES COMPILE_FLAGS
-                      "${CMAKE_CXX_FLAGS} -DNO_CUDA_SDK")
-target_include_directories(tc_core_cuda_no_sdk PUBLIC ${LLVM_INCLUDE_DIRS})
-target_link_libraries(
-  tc_core_cuda_no_sdk
+#set_target_properties(tc_core_cuda_no_sdk
+                      #PROPERTIES COMPILE_FLAGS
+                      #"${CMAKE_CXX_FLAGS} -DNO_CUDA_SDK")
+#target_include_directories(tc_core_cuda_no_sdk PUBLIC ${LLVM_INCLUDE_DIRS})
+#target_link_libraries(
+  #tc_core_cuda_no_sdk
 
-  ${HALIDE_LIBRARIES}
-  -lLLVM
+  #${HALIDE_LIBRARIES}
+  #-lLLVM
 
-  tc_lang
-  tc_version
-  tc_proto
-  tc_core
-)
-install(
-  TARGETS
-  tc_core_cuda_no_sdk
+  #tc_lang
+  #tc_version
+  #tc_proto
+  #tc_core
+#)
+#install(
+  #TARGETS
+  #tc_core_cuda_no_sdk
 
-  DESTINATION lib
-)
+  #DESTINATION lib
+#)
 
 ################################################################################
 # tc_cuda
 #
 # Core CUDA library for compiling to PTX and running on actual GPUs
 ################################################################################
-if (WITH_CUDA)
-  find_library(CUDA_NVRTC_LIBRARIES nvrtc
-    PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-    PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs)
+#if (WITH_CUDA)
+  #find_library(CUDA_NVRTC_LIBRARIES nvrtc
+    #PATHS ${CUDA_TOOLKIT_ROOT_DIR}
+    #PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs)
 
-  add_library(
-    tc_cuda
+  #add_library(
+    #tc_cuda
 
-    SHARED
+    #SHARED
 
-    ${TC_CUDA_CROSS_COMPILE_FILES}
+    #${TC_CUDA_CROSS_COMPILE_FILES}
 
-    # Files needed for execution
-    cuda/cuda.cc
-    cuda/cuda_rtc.cc
-    cuda/cuda_tc_executor.cc
-  )
-  target_include_directories(tc_cuda PUBLIC ${LLVM_INCLUDE_DIRS})
-  target_link_libraries(
-    tc_cuda
+    ## Files needed for execution
+    #cuda/cuda.cc
+    #cuda/cuda_rtc.cc
+    #cuda/cuda_tc_executor.cc
+  #)
+  #target_include_directories(tc_cuda PUBLIC ${LLVM_INCLUDE_DIRS})
+  #target_link_libraries(
+    #tc_cuda
 
-    ${CUDA_CUDA_LIBRARIES}
-    ${CUDA_curand_LIBRARY}
-    ${CUDA_LIBRARIES}
-    ${CUDA_NVRTC_LIBRARIES}
+    #${CUDA_CUDA_LIBRARIES}
+    #${CUDA_curand_LIBRARY}
+    #${CUDA_LIBRARIES}
+    #${CUDA_NVRTC_LIBRARIES}
 
-    tc_lang
-    tc_version
-    tc_proto
-    tc_core
-  )
-  install(
-    TARGETS
-    tc_cuda
+    #tc_lang
+    #tc_version
+    #tc_proto
+    #tc_core
+  #)
+  #install(
+    #TARGETS
+    #tc_cuda
 
-    DESTINATION lib
-  )
-endif()
+    #DESTINATION lib
+  #)
+#endif()

@@ -38,16 +38,16 @@ target_link_libraries(test_check ${GTEST_LIBRARIES} tc_core)
 ################################################################################
 # CPP cuda_mapper crosscompile tests
 ################################################################################
-set(CORE_TEST_FILES
-  test_cuda_mapper
-  test_cuda_mapper_memory_promotion
-)
+#set(CORE_TEST_FILES
+  #test_cuda_mapper
+  #test_cuda_mapper_memory_promotion
+#)
 
-foreach(i ${CORE_TEST_FILES})
-  add_executable(${i} ${i}.cc)
-  add_test(${i} ${i})
-  target_link_libraries(${i} ${GTEST_LIBRARIES} tc_core_cuda_no_sdk pthread)
-endforeach()
+#foreach(i ${CORE_TEST_FILES})
+  #add_executable(${i} ${i}.cc)
+  #add_test(${i} ${i})
+  #target_link_libraries(${i} ${GTEST_LIBRARIES} tc_core_cuda_no_sdk pthread)
+#endforeach()
 
 ################################################################################
 # CPP mapper tests, execution should use ATen C++ API
@@ -78,6 +78,6 @@ foreach(i ${TEST_TC_FILES})
   target_link_libraries(${i} ${GTEST_LIBRARIES} tc_lang pthread)
 endforeach()
 
-if (WITH_CUDA)
-  add_subdirectory(cuda)
-endif()
+#if (WITH_CUDA)
+  #add_subdirectory(cuda)
+#endif()

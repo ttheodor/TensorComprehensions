@@ -152,6 +152,18 @@ class Checker {
     throw ExceptionType(ss.str());
   }
 
+  Checker& operator<<(const std::string& msg) {
+    try {
+      std::stringstream ss;
+      ss << additionalMsg_ << msg;
+      additionalMsg_ = ss.str();
+    } catch (...) {
+      // If the above throws and we don't catch the exception then the
+      // destructor will throw a second one and the program will terminate.
+    }
+    return *this;
+  }
+
   template <typename T>
   typename std::enable_if<!tc::is_std_container<T>::value, Checker&>::type
   operator<<(const T& msg) {
