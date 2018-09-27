@@ -22,7 +22,7 @@
 
 #include <dlpack/dlpack.h>
 
-#include "tc/proto/compcache.pb.h"
+#include <compcache.pb.h>
 
 /**
  * Various tensor utilities used in the Tensor Comprehensions compiler.

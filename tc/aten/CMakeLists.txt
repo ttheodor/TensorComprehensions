@@ -17,6 +17,7 @@ target_link_libraries(
   ${HALIDE_LIBRARIES}
 
   tc_core
+  tc_proto
 )
 
 install(TARGETS tc_aten DESTINATION lib)

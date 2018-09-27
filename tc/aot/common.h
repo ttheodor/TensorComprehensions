@@ -9,7 +9,7 @@
 #include "tc/core/cuda/cuda_backend.h"
 #include "tc/core/cuda/cuda_mapping_options.h"
 #include "tc/core/tensor.h"
-#include "tc/proto/aot.pb.h"
+#include <aot.pb.h>
 
 namespace tc {
 

@@ -21,7 +21,7 @@
 #include <google/protobuf/text_format.h>
 
 #include "tc/core/check.h"
-#include "tc/proto/compcache.pb.h"
+#include <compcache.pb.h>
 
 namespace tc {
 template <typename T>

@@ -52,46 +52,22 @@ endif()
 # protobuf-3.5.2 (must use the same version as Caffe2 as long as we use Caffe2)
 ################################################################################
 # TODO: turn this horror into a custom command and custom targets
-find_program(test_PROTOBUF_PROTOC_EXECUTABLE protoc
-  PATHS ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-  PATH_SUFFIXES src/
-  NO_DEFAULT_PATH)
-if (NOT test_PROTOBUF_PROTOC_EXECUTABLE)
-  execute_process(
-    COMMAND ./autogen.sh
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-  )
-  execute_process(
-    COMMAND ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --disable-shared --enable-static
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-  )
-endif()
+#find_program(test_PROTOBUF_PROTOC_EXECUTABLE protoc
+  #PATHS ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
+  #PATH_SUFFIXES src/
+  #NO_DEFAULT_PATH)
+#if (NOT test_PROTOBUF_PROTOC_EXECUTABLE)
+  #execute_process(
+    #COMMAND ./autogen.sh
+    #WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
+  #)
+  #execute_process(
+    #COMMAND ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --disable-shared --enable-static
+    #WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
+  #)
+#endif()
 
 # TODO: For some reason make -j"$(nproc)" fails here
-execute_process(
-  COMMAND make -j8
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-)
-find_library(PROTOBUF_LIBRARIES libprotobuf.a
-  REQUIRED
-  PATHS ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-  PATH_SUFFIXES src/.libs
-  NO_DEFAULT_PATH)
-message("Found PROTOBUF_LIBRARIES:" ${PROTOBUF_LIBRARIES})
-find_program(PROTOBUF_PROTOC_EXECUTABLE protoc
-  REQUIRED
-  PATHS ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-  PATH_SUFFIXES src/
-  NO_DEFAULT_PATH)
-message("Found PROTOBUF_PROTOC_EXECUTABLE:" ${PROTOBUF_PROTOC_EXECUTABLE})
-find_path(PROTOBUF_INCLUDES google
-  REQUIRED
-  PATHS ${PROJECT_SOURCE_DIR}/third-party/googlelibraries/protobuf-3.5.2
-  PATH_SUFFIXES src
-  NO_DEFAULT_PATH)
-message("Found PROTOBUF_INCLUDES:" ${PROTOBUF_INCLUDES})
-include_directories(BEFORE ${PROTOBUF_INCLUDES})
-
 ################################################################################
 # gflags
 ################################################################################
@@ -129,7 +105,7 @@ set(gtest_INCLUDE_DIR ${gtest_SOURCE_DIR}/include)
 #################################################################################
 ## Set GOOGLE_LIBRARIES
 #################################################################################
-set(GOOGLE_LIBRARIES ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES} ${GTEST_LIBRARIES} ${PROTOBUF_LIBRARIES})
+set(GOOGLE_LIBRARIES ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES} ${GTEST_LIBRARIES})
 
 ################################################################################
 # cuda
@@ -157,7 +133,7 @@ if(WITH_CUDA)
   ##############################################################################
   find_library(CUDA_CUDA_LIBRARIES cuda
     PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-    PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs)
+    PATH_SUFFIXES lib64 lib64/stubs)
 
   set(CUDA_CUDA_LIBRARY ${CUDA_CUDA_LIBRARIES})
 

@@ -25,7 +25,7 @@ namespace fs = std::experimental::filesystem;
 #include "tc/core/cuda/cuda_backend.h"
 #include "tc/core/tensor.h"
 #include "tc/library/group_convolution.h"
-#include "tc/proto/aot.pb.h"
+#include <aot.pb.h>
 #include "tc/version/version.h"
 
 namespace {

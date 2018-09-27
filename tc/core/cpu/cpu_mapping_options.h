@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "tc/proto/mapping_options.pb.h"
+#include <mapping_options.pb.h>
 
 #include "tc/core/mapping_options.h"
 
