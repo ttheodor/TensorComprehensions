@@ -112,7 +112,9 @@ std::string generateOpenCL(
       halideComponents,
       inputs,
       /* TODO outputs, */
-      tc::CudaMappingOptions::makeNaiveMappingOptions());
+      tc::CudaMappingOptions::makeNaiveMappingOptions()
+          .mapToThreads({1, 1, 1})
+          .mapToBlocks({1, 1, 1}));
 
   return compilationResult.source;
 }
