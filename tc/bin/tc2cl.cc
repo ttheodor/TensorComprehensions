@@ -42,6 +42,19 @@ class Tensor {
     return name_;
   }
 
+  friend std::ostream& operator<<(std::ostream& out, const Tensor& t) {
+    out << t.name_ << '[';
+
+    for (int i = 0; i < t.sizes.size() - 1; ++i)
+      out << t.sizes[i] << " , ";
+
+    if (not t.sizes.empty())
+      out << t.sizes.back();
+
+    out << ']';
+    return out;
+  }
+
   const DLConstTensor* toDLT() const {
     // XXX: leak everything and let the OS do the dirty work
     DLConstTensor* t = new DLConstTensor();
@@ -62,14 +75,22 @@ class Tensor {
   std::vector<uint64_t> sizes;
 };
 
-std::vector<const DLConstTensor*> makeInputs(
+std::vector<Tensor> makeTensors(
     const lang::TreeRef& t,
     const std::unordered_map<std::string, uint64_t>& sizeMap) {
-  std::vector<const DLConstTensor*> inputs;
-
+  std::vector<Tensor> ts;
   for (auto p : lang::Def(t).params()) {
-    inputs.push_back(Tensor(p, sizeMap).toDLT());
+    ts.push_back(Tensor(p, sizeMap));
   }
+  return ts;
+}
+
+std::vector<const DLConstTensor*> makeInputs(const std::vector<Tensor>& ts) {
+  std::vector<const DLConstTensor*> inputs;
+  std::transform(
+      ts.begin(), ts.end(), std::back_inserter(inputs), [](const Tensor& t) {
+        return t.toDLT();
+      });
 
   return inputs;
 }
@@ -135,6 +156,9 @@ int main(int argc, char* argv[]) {
     const auto& entryPoint = p.first;
     const auto& TC = p.second;
     std::cout << "//Generating code for " << entryPoint << std::endl;
-    std::cout << generateOpenCL(TC, makeInputs(TC, inputSizes)) << std::endl;
+    auto ts = makeTensors(TC, inputSizes);
+    std::cout << generateOpenCL(TC, makeInputs(ts)) << std::endl;
+    for (const auto& t : ts)
+      std::cout << "// " << t << std::endl;
   }
 }
