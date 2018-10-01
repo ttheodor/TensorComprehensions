@@ -45,7 +45,7 @@ class Tensor {
   friend std::ostream& operator<<(std::ostream& out, const Tensor& t) {
     out << t.name_ << '[';
 
-    for (int i = 0; i < t.sizes.size() - 1; ++i)
+    for (uint64_t i = 0; i < t.sizes.size() - 1; ++i)
       out << t.sizes[i] << " , ";
 
     if (not t.sizes.empty())
@@ -118,7 +118,7 @@ std::unordered_map<std::string, uint64_t> parseSizes() {
   return sizes;
 }
 
-std::string generateOpenCL(
+std::pair<std::string, std::vector<tc::TensorInfo>> generateOpenCL(
     const lang::TreeRef& t,
     const std::vector<const DLConstTensor*> inputs) {
   auto inputsInfo = tc::makeTensorInfoVector(inputs);
@@ -137,7 +137,7 @@ std::string generateOpenCL(
           .mapToThreads({1, 1, 1})
           .mapToBlocks({1, 1, 1}));
 
-  return compilationResult.source;
+  return {compilationResult.source, outputsInfo};
 }
 
 int main(int argc, char* argv[]) {
@@ -157,8 +157,20 @@ int main(int argc, char* argv[]) {
     const auto& TC = p.second;
     std::cout << "//Generating code for " << entryPoint << std::endl;
     auto ts = makeTensors(TC, inputSizes);
-    std::cout << generateOpenCL(TC, makeInputs(ts)) << std::endl;
+    auto res = generateOpenCL(TC, makeInputs(ts));
+    std::cout << res.first;
     for (const auto& t : ts)
       std::cout << "// " << t << std::endl;
+
+    int i = 0;
+    for (const auto& o : res.second) {
+      std::cout << "// Output" << i++ << '[';
+      for (uint64_t d = 0; d < o.shape.size() - 1; ++d) {
+        std::cout << o.shape[d] << " , ";
+      }
+      if (not o.shape.empty() > 0)
+        std::cout << o.shape.back();
+      std::cout << ']' << std::endl;
+    }
   }
 }
